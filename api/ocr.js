@@ -1,8 +1,25 @@
+// ============================================================
+// JNI TRAVEL OCR
+// OCR.SPACE - ENGINE 2
+// POSITION-AWARE PARSER
+//
+// Dokumen:
+// 1. KTP
+// 2. KK
+// 3. Passport
+//
+// Prinsip:
+// - KTP: value umumnya berada DI SEBELAH KANAN label
+// - Passport: value umumnya berada DI BAWAH label
+// - KK: data anggota dibaca sebagai tabel
+// - Nama Ayah WAJIB dari kolom Nama Ayah
+// ============================================================
+
 module.exports = async function handler(req, res) {
-  // =========================================================
-  // JNI TRAVEL OCR
-  // OCR.SPACE - FREE
-  // =========================================================
+
+  // ----------------------------------------------------------
+  // METHOD
+  // ----------------------------------------------------------
 
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -13,14 +30,25 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const apiKey = process.env.OCR_SPACE_API_KEY;
+
+    // --------------------------------------------------------
+    // API KEY
+    // --------------------------------------------------------
+
+    const apiKey =
+      process.env.OCR_SPACE_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({
         ok: false,
-        error: "OCR_SPACE_API_KEY belum tersedia di Vercel."
+        error:
+          "OCR_SPACE_API_KEY belum tersedia."
       });
     }
+
+    // --------------------------------------------------------
+    // REQUEST
+    // --------------------------------------------------------
 
     const {
       documentType,
@@ -36,6 +64,10 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // --------------------------------------------------------
+    // FORMAT
+    // --------------------------------------------------------
+
     const allowedTypes = [
       "image/jpeg",
       "image/png",
@@ -50,45 +82,54 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // =======================================================
+    // --------------------------------------------------------
     // DATA URL
-    // =======================================================
+    // --------------------------------------------------------
 
-    const match = dataUrl.match(
-      /^data:([^;]+);base64,(.+)$/
-    );
+    const match =
+      dataUrl.match(
+        /^data:([^;]+);base64,(.+)$/
+      );
 
     if (!match) {
       return res.status(400).json({
         ok: false,
-        error: "Format file tidak valid."
+        error: "Data file tidak valid."
       });
     }
 
-    const detectedMime = match[1];
-    const base64Data = match[2];
+    const detectedMime =
+      match[1];
 
-    // =======================================================
-    // LIMIT FREE OCR.SPACE = 1 MB
-    // =======================================================
+    const base64Data =
+      match[2];
 
-    const fileSizeBytes = Math.ceil(
-      (base64Data.length * 3) / 4
-    );
+    // --------------------------------------------------------
+    // MAX 1 MB
+    // --------------------------------------------------------
 
-    if (fileSizeBytes > 1024 * 1024) {
+    const fileSizeBytes =
+      Math.ceil(
+        (base64Data.length * 3) / 4
+      );
+
+    if (
+      fileSizeBytes >
+      1024 * 1024
+    ) {
       return res.status(400).json({
         ok: false,
         error:
-          "File lebih dari 1 MB. Kompres gambar terlebih dahulu."
+          "File lebih dari 1 MB. Kompres file terlebih dahulu."
       });
     }
 
-    // =======================================================
-    // FORM OCR.SPACE
-    // =======================================================
+    // --------------------------------------------------------
+    // OCR.SPACE FORM
+    // --------------------------------------------------------
 
-    const form = new FormData();
+    const form =
+      new FormData();
 
     form.append(
       "base64Image",
@@ -96,106 +137,164 @@ module.exports = async function handler(req, res) {
     );
 
     // Engine 2
-    form.append("OCREngine", "2");
+    form.append(
+      "OCREngine",
+      "2"
+    );
 
-    // Auto detect language
-    form.append("language", "auto");
+    // English cukup untuk layout Indonesia.
+    // Engine akan tetap membaca nama/alamat Indonesia.
+    form.append(
+      "language",
+      "eng"
+    );
 
-    // WAJIB untuk parser posisi
-    form.append("isOverlayRequired", "true");
+    // PENTING:
+    // kita membutuhkan koordinat.
+    form.append(
+      "isOverlayRequired",
+      "true"
+    );
 
-    // Auto rotate
-    form.append("detectOrientation", "true");
+    form.append(
+      "detectOrientation",
+      "true"
+    );
 
-    // Upscaling
-    form.append("scale", "true");
+    form.append(
+      "scale",
+      "true"
+    );
 
-    // KK adalah tabel
     if (
       String(documentType || "")
         .toLowerCase()
         .includes("kk")
     ) {
-      form.append("isTable", "true");
-    } else {
-      form.append("isTable", "false");
+      form.append(
+        "isTable",
+        "true"
+      );
     }
 
-    // =======================================================
+    // --------------------------------------------------------
     // CALL OCR.SPACE
-    // =======================================================
+    // --------------------------------------------------------
 
-    const response = await fetch(
-      "https://api.ocr.space/parse/image",
-      {
-        method: "POST",
-        headers: {
-          apikey: apiKey
-        },
-        body: form
-      }
-    );
+    const response =
+      await fetch(
+        "https://api.ocr.space/parse/image",
+        {
+          method: "POST",
 
-    const raw = await response.text();
+          headers: {
+            apikey: apiKey
+          },
+
+          body: form
+        }
+      );
+
+    const raw =
+      await response.text();
 
     let result;
 
     try {
-      result = JSON.parse(raw);
+      result =
+        JSON.parse(raw);
     } catch {
       return res.status(502).json({
         ok: false,
         error:
-          "OCR.space mengembalikan response bukan JSON.",
-        httpStatus: response.status,
-        raw: raw.substring(0, 2000)
+          "OCR.space mengembalikan response yang tidak valid.",
+        httpStatus:
+          response.status
       });
     }
+
+    // --------------------------------------------------------
+    // OCR ERROR
+    // --------------------------------------------------------
 
     if (!response.ok) {
       return res.status(502).json({
         ok: false,
-        error: "OCR.space API error.",
-        httpStatus: response.status,
-        details: result
+        error:
+          "OCR.space API error.",
+        httpStatus:
+          response.status,
+        details:
+          result
       });
     }
 
-    if (result.IsErroredOnProcessing) {
+    if (
+      result.IsErroredOnProcessing
+    ) {
       return res.status(422).json({
         ok: false,
         error:
-          result.ErrorMessage ||
-          "OCR gagal memproses dokumen.",
+          Array.isArray(
+            result.ErrorMessage
+          )
+            ? result.ErrorMessage.join(" ")
+            : (
+                result.ErrorMessage ||
+                "OCR gagal."
+              ),
+
         details:
-          result.ErrorDetails || null
+          result.ErrorDetails ||
+          null
       });
     }
 
-    // =======================================================
-    // PARSED RESULTS
-    // =======================================================
+    // --------------------------------------------------------
+    // RESULTS
+    // --------------------------------------------------------
 
     const parsedResults =
-      Array.isArray(result.ParsedResults)
+      Array.isArray(
+        result.ParsedResults
+      )
         ? result.ParsedResults
         : [];
 
     if (!parsedResults.length) {
       return res.status(422).json({
         ok: false,
-        error: "OCR tidak menghasilkan halaman."
+        error:
+          "OCR tidak menghasilkan halaman."
       });
     }
 
-    const rawText = parsedResults
-      .map(x => x?.ParsedText || "")
-      .filter(Boolean)
-      .join("\n");
+    // --------------------------------------------------------
+    // RAW TEXT
+    // --------------------------------------------------------
 
-    const overlay = parsedResults
-      .map(x => x?.TextOverlay || null)
-      .filter(Boolean);
+    const rawText =
+      parsedResults
+        .map(
+          x =>
+            x?.ParsedText ||
+            ""
+        )
+        .filter(Boolean)
+        .join("\n");
+
+    // --------------------------------------------------------
+    // OVERLAY
+    // --------------------------------------------------------
+
+    const overlay =
+      parsedResults
+        .map(
+          x =>
+            x?.TextOverlay ||
+            null
+        )
+        .filter(Boolean);
 
     if (!rawText.trim()) {
       return res.status(422).json({
@@ -205,48 +304,82 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // =======================================================
-    // DETEKSI JENIS DOKUMEN
-    // =======================================================
+    // --------------------------------------------------------
+    // TYPE
+    // --------------------------------------------------------
 
-    const type = detectDocumentType(
-      documentType,
-      rawText
-    );
+    const type =
+      detectDocumentType(
+        documentType,
+        rawText
+      );
 
-    // =======================================================
-    // PARSER
-    // =======================================================
+    // --------------------------------------------------------
+    // PARSE
+    // --------------------------------------------------------
 
     let data;
 
     if (type === "ktp") {
-      data = parseKTP(rawText, overlay);
-    } else if (type === "passport") {
-      data = parsePassport(rawText, overlay);
-    } else if (type === "kk") {
-      data = parseKK(rawText, overlay);
+
+      data =
+        parseKTP(
+          rawText,
+          overlay
+        );
+
+    } else if (
+      type === "passport"
+    ) {
+
+      data =
+        parsePassport(
+          rawText,
+          overlay
+        );
+
+    } else if (
+      type === "kk"
+    ) {
+
+      data =
+        parseKK(
+          rawText,
+          overlay
+        );
+
     } else {
-      data = parseGeneric(rawText);
+
+      data =
+        parseGeneric(
+          rawText
+        );
+
     }
 
-    // =======================================================
+    // --------------------------------------------------------
     // VALIDATION
-    // =======================================================
+    // --------------------------------------------------------
 
     const validation =
-      validate(type, data);
+      validate(
+        type,
+        data
+      );
 
-    // =======================================================
+    // --------------------------------------------------------
     // RESPONSE
-    // =======================================================
+    // --------------------------------------------------------
 
     return res.status(200).json({
+
       ok: true,
 
-      fileName: fileName || null,
+      fileName:
+        fileName || null,
 
-      documentType: type,
+      documentType:
+        type,
 
       data,
 
@@ -254,12 +387,17 @@ module.exports = async function handler(req, res) {
 
       rawText,
 
+      // koordinat disimpan agar kita
+      // bisa debugging kalau ada dokumen aneh
       overlay,
 
       ocr: {
+
         engine: 2,
+
         exitCode:
-          result.OCRExitCode || null,
+          result.OCRExitCode ||
+          null,
 
         processingTimeMs:
           result.ProcessingTimeInMilliseconds ||
@@ -267,10 +405,13 @@ module.exports = async function handler(req, res) {
 
         pages:
           parsedResults.length
+
       }
+
     });
 
   } catch (error) {
+
     console.error(
       "JNI OCR ERROR:",
       error
@@ -284,19 +425,28 @@ module.exports = async function handler(req, res) {
         error?.message ||
         String(error)
     });
+
   }
+
 };
 
 
-// =========================================================
+// ============================================================
 // DOCUMENT TYPE
-// =========================================================
+// ============================================================
 
-function detectDocumentType(input, text) {
-  const v = String(input || "")
-    .toLowerCase();
+function detectDocumentType(
+  input,
+  text
+) {
 
-  if (v.includes("ktp")) {
+  const v =
+    String(input || "")
+      .toLowerCase();
+
+  if (
+    v.includes("ktp")
+  ) {
     return "ktp";
   }
 
@@ -314,7 +464,9 @@ function detectDocumentType(input, text) {
     return "passport";
   }
 
-  const t = text.toUpperCase();
+  const t =
+    String(text || "")
+      .toUpperCase();
 
   if (
     t.includes("KARTU KELUARGA") ||
@@ -333,7 +485,10 @@ function detectDocumentType(input, text) {
 
   if (
     t.includes("NIK") &&
-    t.includes("TEMPAT/TGL LAHIR")
+    (
+      t.includes("TEMPAT/TGL") ||
+      t.includes("TEMPAT / TGL")
+    )
   ) {
     return "ktp";
   }
@@ -342,373 +497,772 @@ function detectDocumentType(input, text) {
 }
 
 
-// =========================================================
-// NORMALIZE
-// =========================================================
+// ============================================================
+// BASIC
+// ============================================================
 
-function clean(value) {
-  if (!value) return null;
+function clean(
+  value
+) {
 
-  return String(value)
-    .replace(/\s+/g, " ")
-    .replace(/^[\s:;,\-–—]+/, "")
-    .replace(/[\s:;,\-–—]+$/, "")
-    .trim() || null;
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const v =
+    String(value)
+      .replace(
+        /\s+/g,
+        " "
+      )
+      .replace(
+        /^[\s:;,\-|–—]+/,
+        ""
+      )
+      .replace(
+        /[\s:;,\-|–—]+$/,
+        ""
+      )
+      .trim();
+
+  return v || null;
 }
 
 
-// =========================================================
+function normalizeUpper(
+  value
+) {
+
+  return String(
+    value || ""
+  )
+    .toUpperCase()
+    .replace(
+      /[^A-Z0-9]+/g,
+      " "
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
+
+}
+
+
+// ============================================================
 // DATE
-// =========================================================
+// ============================================================
 
-function normalizeDate(value) {
-  if (!value) return null;
+function normalizeDate(
+  value
+) {
 
-  const v = clean(value);
+  if (!value) {
+    return null;
+  }
 
-  if (!v) return null;
+  const v =
+    clean(value);
 
-  const m = v.match(
-    /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/
-  );
+  if (!v) {
+    return null;
+  }
 
-  if (m) {
-    return (
-      m[1].padStart(2, "0") +
-      "-" +
-      m[2].padStart(2, "0") +
-      "-" +
-      m[3]
+  const numeric =
+    v.match(
+      /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/
     );
+
+  if (numeric) {
+
+    return (
+      numeric[1].padStart(2, "0") +
+      "-" +
+      numeric[2].padStart(2, "0") +
+      "-" +
+      numeric[3]
+    );
+
   }
 
   return v;
+
 }
 
 
-// =========================================================
-// OCR LINES
-// =========================================================
+// ============================================================
+// OVERLAY -> LINES
+// ============================================================
 
-function getLines(overlay) {
-  const all = [];
-
-  for (const page of overlay || []) {
-    for (
-      const line of page?.Lines || []
-    ) {
-      const words =
-        line?.Words || [];
-
-      if (!words.length) continue;
-
-      const sorted =
-        [...words].sort(
-          (a, b) =>
-            Number(a.Left || 0) -
-            Number(b.Left || 0)
-        );
-
-      const text = sorted
-        .map(x =>
-          String(
-            x.WordText || ""
-          )
-        )
-        .join(" ")
-        .trim();
-
-      all.push({
-        text,
-        words: sorted,
-        top: Number(
-          line.MinTop || 0
-        ),
-        height: Number(
-          line.MaxHeight || 0
-        ),
-        left: Number(
-          sorted[0]?.Left || 0
-        ),
-        right:
-          Math.max(
-            ...sorted.map(
-              x =>
-                Number(x.Left || 0) +
-                Number(x.Width || 0)
-            )
-          )
-      });
-    }
-  }
-
-  return all;
-}
-
-
-// =========================================================
-// FIND VALUE ON SAME LINE
-// =========================================================
-
-function valueAfterLabel(
-  lineText,
-  labels
-) {
-  const upper =
-    lineText.toUpperCase();
-
-  for (const label of labels) {
-    const idx =
-      upper.indexOf(
-        label.toUpperCase()
-      );
-
-    if (idx < 0) continue;
-
-    let value =
-      lineText.substring(
-        idx + label.length
-      );
-
-    value = value
-      .replace(/^[\s:.\-–—]+/, "")
-      .trim();
-
-    if (value) {
-      return clean(value);
-    }
-  }
-
-  return null;
-}
-
-
-// =========================================================
-// FIND LINE BY LABEL
-// =========================================================
-
-function findLine(
-  lines,
-  labels
-) {
-  return lines.find(line =>
-    labels.some(label =>
-      line.text
-        .toUpperCase()
-        .includes(
-          label.toUpperCase()
-        )
-    )
-  );
-}
-
-
-// =========================================================
-// FIND NEXT VALUE LINE
-// =========================================================
-
-function nextMeaningfulLine(
-  lines,
-  index,
-  labels
-) {
-  for (
-    let i = index + 1;
-    i < Math.min(
-      lines.length,
-      index + 4
-    );
-    i++
-  ) {
-    const text =
-      lines[i].text.trim();
-
-    if (!text) continue;
-
-    const isLabel =
-      labels.some(label =>
-        text
-          .toUpperCase()
-          .includes(
-            label.toUpperCase()
-          )
-      );
-
-    if (!isLabel) {
-      return text;
-    }
-  }
-
-  return null;
-}
-
-
-// =========================================================
-// EXTRACT 16 DIGIT
-// =========================================================
-
-function extract16(text) {
-  const found =
-    text.match(
-      /\b\d{16}\b/g
-    ) || [];
-
-  return found[0] || null;
-}
-
-
-// =========================================================
-// KTP
-// =========================================================
-
-function parseKTP(
-  text,
+function getLines(
   overlay
 ) {
-  const lines =
-    getLines(overlay);
 
-  // -------------------------
-  // NIK
-  // -------------------------
+  const lines = [];
 
-  const nik =
-    extract16(text);
+  for (
+    const page of overlay || []
+  ) {
 
-  // -------------------------
-  // NAMA
-  // -------------------------
+    for (
+      const line of
+      page?.Lines || []
+    ) {
 
-  let nama = null;
+      const words =
+        Array.isArray(
+          line?.Words
+        )
+          ? line.Words
+          : [];
 
-  const namaLine =
-    findLine(lines, ["NAMA"]);
+      if (!words.length) {
+        continue;
+      }
 
-  if (namaLine) {
-    nama =
-      valueAfterLabel(
-        namaLine.text,
-        ["NAMA"]
-      );
+      const sorted =
+        [...words]
+          .sort(
+            (a, b) =>
+              Number(
+                a.Left || 0
+              ) -
+              Number(
+                b.Left || 0
+              )
+          );
+
+      const text =
+        sorted
+          .map(
+            w =>
+              String(
+                w.WordText || ""
+              )
+          )
+          .join(" ")
+          .trim();
+
+      if (!text) {
+        continue;
+      }
+
+      const left =
+        Math.min(
+          ...sorted.map(
+            w =>
+              Number(
+                w.Left || 0
+              )
+          )
+        );
+
+      const right =
+        Math.max(
+          ...sorted.map(
+            w =>
+              Number(
+                w.Left || 0
+              ) +
+              Number(
+                w.Width || 0
+              )
+          )
+        );
+
+      const top =
+        Number(
+          line.MinTop ??
+          sorted[0]?.Top ??
+          0
+        );
+
+      const bottom =
+        Math.max(
+          ...sorted.map(
+            w =>
+              Number(
+                w.Top ?? top
+              ) +
+              Number(
+                w.Height || 0
+              )
+          )
+        );
+
+      lines.push({
+
+        text,
+
+        words: sorted,
+
+        left,
+
+        right,
+
+        top,
+
+        bottom,
+
+        centerX:
+          (left + right) / 2,
+
+        centerY:
+          (top + bottom) / 2
+
+      });
+
+    }
+
   }
 
-  // -------------------------
-  // TEMPAT / TGL LAHIR
-  // -------------------------
+  return lines.sort(
+    (a, b) =>
+      a.top - b.top ||
+      a.left - b.left
+  );
 
-  let tempatLahir = null;
-  let tanggalLahir = null;
+}
 
-  const ttlIndex =
-    lines.findIndex(line =>
-      /TEMPAT\s*\/?\s*TGL|TEMPAT\/TGL|TEMPAT\/TGL\.|TEMPAT.*LAHIR/i
-        .test(line.text)
+
+// ============================================================
+// LABEL MATCHING
+// ============================================================
+
+function lineContainsLabel(
+  line,
+  labels
+) {
+
+  const text =
+    normalizeUpper(
+      line.text
     );
 
-  if (ttlIndex >= 0) {
-    const current =
-      lines[ttlIndex].text;
+  return labels.some(
+    label =>
+      text.includes(
+        normalizeUpper(label)
+      )
+  );
 
-    let value =
-      valueAfterLabel(
-        current,
-        [
-          "TEMPAT/TGL LAHIR",
-          "TEMPAT / TGL LAHIR",
-          "TEMPAT/TGL. LAHIR",
-          "TEMPAT / TGL. LAHIR"
-        ]
-      );
+}
 
-    if (!value) {
-      value =
-        nextMeaningfulLine(
-          lines,
-          ttlIndex,
-          [
-            "JENIS KELAMIN",
-            "ALAMAT",
-            "RT/RW"
-          ]
-        );
-    }
 
-    if (value) {
-      const date =
-        value.match(
-          /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
-        );
+// ============================================================
+// FIND LABEL LINE
+// ============================================================
 
-      if (date) {
-        tanggalLahir =
-          normalizeDate(
-            date[0]
-          );
+function findLabelLine(
+  lines,
+  labels
+) {
 
-        tempatLahir =
-          clean(
-            value
-              .replace(
-                date[0],
-                ""
-              )
-              .replace(
-                /[,|]+$/,
-                ""
-              )
-          );
-      } else {
-        // Cari tanggal pada baris berikut
-        for (
-          let i = ttlIndex;
-          i <
-          Math.min(
-            lines.length,
-            ttlIndex + 3
-          );
-          i++
-        ) {
-          const d =
-            lines[i].text.match(
-              /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
-            );
+  return lines.find(
+    line =>
+      lineContainsLabel(
+        line,
+        labels
+      )
+  );
 
-          if (d) {
-            tanggalLahir =
-              normalizeDate(
-                d[0]
-              );
+}
 
-            break;
-          }
-        }
 
-        tempatLahir =
-          clean(value);
-      }
-    }
+// ============================================================
+// FIND ALL LABEL LINES
+// ============================================================
+
+function findLabelLines(
+  lines,
+  labels
+) {
+
+  return lines.filter(
+    line =>
+      lineContainsLabel(
+        line,
+        labels
+      )
+  );
+
+}
+
+
+// ============================================================
+// WORD POSITION
+// ============================================================
+
+function labelGeometry(
+  line,
+  labels
+) {
+
+  const words =
+    line.words || [];
+
+  if (!words.length) {
+    return null;
   }
 
-  // -------------------------
-  // JENIS KELAMIN
-  // -------------------------
+  const normalizedWords =
+    words.map(
+      (w, index) => ({
+        index,
 
-  let jenisKelamin = null;
+        raw:
+          String(
+            w.WordText || ""
+          ),
 
-  const genderLine =
-    findLine(lines, [
-      "JENIS KELAMIN"
-    ]);
+        norm:
+          normalizeUpper(
+            w.WordText || ""
+          ),
 
-  if (genderLine) {
-    jenisKelamin =
-      valueAfterLabel(
-        genderLine.text,
-        ["JENIS KELAMIN"]
+        left:
+          Number(
+            w.Left || 0
+          ),
+
+        right:
+          Number(
+            w.Left || 0
+          ) +
+          Number(
+            w.Width || 0
+          ),
+
+        top:
+          Number(
+            w.Top ??
+            line.top
+          ),
+
+        bottom:
+          Number(
+            w.Top ??
+            line.top
+          ) +
+          Number(
+            w.Height || 0
+          )
+      })
+    );
+
+  // ----------------------------------------------------------
+  // cari sequence kata label
+  // ----------------------------------------------------------
+
+  for (
+    const label of labels
+  ) {
+
+    const target =
+      normalizeUpper(
+        label
+      )
+      .split(" ")
+      .filter(Boolean);
+
+    if (!target.length) {
+      continue;
+    }
+
+    for (
+      let i = 0;
+      i <=
+      normalizedWords.length -
+        target.length;
+      i++
+    ) {
+
+      let ok = true;
+
+      for (
+        let j = 0;
+        j < target.length;
+        j++
+      ) {
+
+        const actual =
+          normalizedWords[
+            i + j
+          ].norm;
+
+        const expected =
+          target[j];
+
+        if (
+          !actual.includes(
+            expected
+          ) &&
+          !expected.includes(
+            actual
+          )
+        ) {
+          ok = false;
+          break;
+        }
+
+      }
+
+      if (ok) {
+
+        const group =
+          normalizedWords.slice(
+            i,
+            i + target.length
+          );
+
+        return {
+
+          startIndex: i,
+
+          endIndex:
+            i +
+            target.length -
+            1,
+
+          left:
+            group[0].left,
+
+          right:
+            group[group.length - 1]
+              .right,
+
+          top:
+            Math.min(
+              ...group.map(
+                x => x.top
+              )
+            ),
+
+          bottom:
+            Math.max(
+              ...group.map(
+                x => x.bottom
+              )
+            ),
+
+          centerX:
+            (
+              group[0].left +
+              group[group.length - 1]
+                .right
+            ) / 2
+
+        };
+
+      }
+
+    }
+
+  }
+
+  // fallback: gunakan seluruh line
+  return {
+
+    startIndex: 0,
+
+    endIndex:
+      words.length - 1,
+
+    left:
+      line.left,
+
+    right:
+      line.right,
+
+    top:
+      line.top,
+
+    bottom:
+      line.bottom,
+
+    centerX:
+      line.centerX
+
+  };
+
+}
+
+
+// ============================================================
+// KTP
+//
+// Layout KTP:
+// LABEL : VALUE
+//
+// Kita mengambil VALUE dari kata-kata
+// di sebelah kanan label.
+// ============================================================
+
+function extractKTPRightValue(
+  lines,
+  labels,
+  options = {}
+) {
+
+  const line =
+    findLabelLine(
+      lines,
+      labels
+    );
+
+  if (!line) {
+    return null;
+  }
+
+  const geo =
+    labelGeometry(
+      line,
+      labels
+    );
+
+  if (!geo) {
+    return null;
+  }
+
+  const words =
+    line.words || [];
+
+  const valueWords = [];
+
+  const minGap =
+    options.minGap ?? 4;
+
+  const maxDistance =
+    options.maxDistance ?? 700;
+
+  for (
+    let i =
+      geo.endIndex + 1;
+    i < words.length;
+    i++
+  ) {
+
+    const w =
+      words[i];
+
+    const left =
+      Number(
+        w.Left || 0
       );
 
+    const right =
+      left +
+      Number(
+        w.Width || 0
+      );
+
+    // harus berada di kanan label
     if (
-      jenisKelamin &&
+      left <
+      geo.right +
+      minGap
+    ) {
+      continue;
+    }
+
+    // jangan terlalu jauh
+    if (
+      left -
+      geo.right >
+      maxDistance
+    ) {
+      break;
+    }
+
+    const word =
+      String(
+        w.WordText || ""
+      );
+
+    if (!word.trim()) {
+      continue;
+    }
+
+    valueWords.push(word);
+
+  }
+
+  if (!valueWords.length) {
+    return null;
+  }
+
+  let value =
+    clean(
+      valueWords.join(" ")
+    );
+
+  // ----------------------------------------------------------
+  // bersihkan label berikutnya jika OCR menyatukan beberapa
+  // field pada satu baris
+  // ----------------------------------------------------------
+
+  const stopPatterns = [
+    "AGAMA",
+    "STATUS PERKAWINAN",
+    "PEKERJAAN",
+    "KEWARGANEGARAAN",
+    "BERLAKU HINGGA"
+  ];
+
+  for (
+    const stop of stopPatterns
+  ) {
+
+    const index =
+      normalizeUpper(
+        value
+      ).indexOf(
+        normalizeUpper(stop)
+      );
+
+    if (index >= 0) {
+
+      // gunakan versi raw dengan pendekatan regex
+      const re =
+        new RegExp(
+          `\\b${stop
+            .replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&"
+            )}\\b.*$`,
+          "i"
+        );
+
+      value =
+        clean(
+          value.replace(
+            re,
+            ""
+          )
+        );
+
+    }
+
+  }
+
+  return value;
+}
+
+
+// ============================================================
+// KTP
+// ============================================================
+
+function parseKTP(
+  rawText,
+  overlay
+) {
+
+  const lines =
+    getLines(
+      overlay
+    );
+
+  // ----------------------------------------------------------
+  // NIK
+  // ----------------------------------------------------------
+
+  const nik =
+    extract16(
+      rawText
+    );
+
+  // ----------------------------------------------------------
+  // NAMA
+  // ----------------------------------------------------------
+
+  const nama =
+    extractKTPRightValue(
+      lines,
+      ["NAMA"],
+      {
+        maxDistance: 700
+      }
+    );
+
+  // ----------------------------------------------------------
+  // TEMPAT / TGL LAHIR
+  // ----------------------------------------------------------
+
+  let tempatLahir = null;
+
+  let tanggalLahir = null;
+
+  const ttl =
+    extractKTPRightValue(
+      lines,
+      [
+        "TEMPAT/TGL LAHIR",
+        "TEMPAT / TGL LAHIR",
+        "TEMPAT/TGL. LAHIR",
+        "TEMPAT / TGL. LAHIR",
+        "TEMPAT TGL LAHIR"
+      ],
+      {
+        maxDistance: 700
+      }
+    );
+
+  if (ttl) {
+
+    const date =
+      ttl.match(
+        /\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\b/
+      );
+
+    if (date) {
+
+      tanggalLahir =
+        normalizeDate(
+          date[0]
+        );
+
+      tempatLahir =
+        clean(
+          ttl.replace(
+            date[0],
+            ""
+          )
+        );
+
+    } else {
+
+      tempatLahir =
+        ttl;
+
+    }
+
+  }
+
+  // ----------------------------------------------------------
+  // JENIS KELAMIN
+  // ----------------------------------------------------------
+
+  let jenisKelamin =
+    extractKTPRightValue(
+      lines,
+      [
+        "JENIS KELAMIN"
+      ],
+      {
+        maxDistance: 500
+      }
+    );
+
+  if (
+    jenisKelamin
+  ) {
+
+    if (
       /LAKI/i.test(
         jenisKelamin
       )
@@ -717,8 +1271,7 @@ function parseKTP(
         "LAKI-LAKI";
     }
 
-    if (
-      jenisKelamin &&
+    else if (
       /PEREMPUAN/i.test(
         jenisKelamin
       )
@@ -726,115 +1279,112 @@ function parseKTP(
       jenisKelamin =
         "PEREMPUAN";
     }
+
   }
 
-  // -------------------------
+  // ----------------------------------------------------------
   // ALAMAT
-  // -------------------------
+  // ----------------------------------------------------------
 
   const alamat =
-    getField(
+    extractKTPRightValue(
       lines,
-      [
-        "ALAMAT"
-      ],
-      [
-        "RT/RW",
-        "KEL/DESA",
-        "KELURAHAN/DESA",
-        "KECAMATAN"
-      ]
+      ["ALAMAT"],
+      {
+        maxDistance: 1000
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // RT/RW
-  // -------------------------
+  // ----------------------------------------------------------
 
   const rtRw =
-    getField(
+    extractKTPRightValue(
       lines,
       ["RT/RW"],
+      {
+        maxDistance: 500
+      }
+    );
+
+  // ----------------------------------------------------------
+  // KELURAHAN
+  // ----------------------------------------------------------
+
+  const kelurahan =
+    extractKTPRightValue(
+      lines,
       [
         "KEL/DESA",
         "KELURAHAN/DESA",
-        "KECAMATAN"
-      ]
-    );
-
-  // -------------------------
-  // KELURAHAN
-  // -------------------------
-
-  const kelurahan =
-    getField(
-      lines,
-      [
-        "KEL/DESA",
-        "KELURAHAN/DESA"
+        "KEL DESA"
       ],
-      [
-        "KECAMATAN"
-      ]
+      {
+        maxDistance: 500
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // KECAMATAN
-  // -------------------------
+  // ----------------------------------------------------------
 
   const kecamatan =
-    getField(
+    extractKTPRightValue(
       lines,
       ["KECAMATAN"],
-      [
-        "AGAMA",
-        "STATUS PERKAWINAN",
-        "PEKERJAAN"
-      ]
+      {
+        maxDistance: 500
+      }
     );
 
-  // -------------------------
-  // STATUS PERKAWINAN
-  // -------------------------
+  // ----------------------------------------------------------
+  // STATUS
+  // ----------------------------------------------------------
 
   const statusPerkawinan =
-    getField(
+    extractKTPRightValue(
       lines,
       ["STATUS PERKAWINAN"],
-      [
-        "PEKERJAAN",
-        "KEWARGANEGARAAN"
-      ]
+      {
+        maxDistance: 500
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // PEKERJAAN
-  // -------------------------
+  // ----------------------------------------------------------
 
   const pekerjaan =
-    getField(
+    extractKTPRightValue(
       lines,
       ["PEKERJAAN"],
-      [
-        "KEWARGANEGARAAN",
-        "BERLAKU HINGGA"
-      ]
+      {
+        maxDistance: 600
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // KEWARGANEGARAAN
-  // -------------------------
+  // ----------------------------------------------------------
 
   const kewarganegaraan =
-    getField(
+    extractKTPRightValue(
       lines,
       ["KEWARGANEGARAAN"],
-      [
-        "BERLAKU HINGGA"
-      ]
+      {
+        maxDistance: 500
+      }
     );
 
+  // ----------------------------------------------------------
+  // FALLBACK
+  // ----------------------------------------------------------
+
   return {
-    document_type: "ktp",
+
+    document_type:
+      "ktp",
 
     nik,
 
@@ -865,134 +1415,327 @@ function parseKTP(
     pekerjaan,
 
     kewarganegaraan
+
   };
+
 }
 
 
-// =========================================================
-// GENERIC FIELD
-// =========================================================
+// ============================================================
+// PASSPORT
+//
+// Layout passport Indonesia pada contoh:
+//
+// LABEL
+// VALUE
+//
+// Untuk field yang satu baris dengan field lain,
+// kita cari VALUE tepat di bawah label berdasarkan
+// overlap posisi X.
+// ============================================================
 
-function getField(
+function extractPassportBelowValue(
   lines,
   labels,
-  stopLabels
+  options = {}
 ) {
-  const index =
-    lines.findIndex(line =>
-      labels.some(label =>
-        line.text
-          .toUpperCase()
-          .includes(
-            label.toUpperCase()
-          )
-      )
-    );
 
-  if (index < 0) {
-    return null;
-  }
-
-  const line =
-    lines[index];
-
-  let value =
-    valueAfterLabel(
-      line.text,
+  const labelLine =
+    findLabelLine(
+      lines,
       labels
     );
 
-  if (value) {
-    // Potong kalau ada label berikutnya
-    for (
-      const stop of stopLabels
-    ) {
-      const pos =
-        value
-          .toUpperCase()
-          .indexOf(
-            stop.toUpperCase()
-          );
-
-      if (pos >= 0) {
-        value =
-          value.substring(
-            0,
-            pos
-          ).trim();
-      }
-    }
-
-    if (value) {
-      return clean(value);
-    }
+  if (!labelLine) {
+    return null;
   }
 
-  return clean(
-    nextMeaningfulLine(
-      lines,
-      index,
-      stopLabels
-    )
+  const geo =
+    labelGeometry(
+      labelLine,
+      labels
+    );
+
+  if (!geo) {
+    return null;
+  }
+
+  const labelLeft =
+    geo.left;
+
+  const labelRight =
+    geo.right;
+
+  const labelCenter =
+    geo.centerX;
+
+  const maxVertical =
+    options.maxVertical ??
+    90;
+
+  const minVertical =
+    options.minVertical ??
+    3;
+
+  const candidates = [];
+
+  for (
+    const line of lines
+  ) {
+
+    // harus di bawah
+    if (
+      line.top <=
+      labelLine.bottom +
+      minVertical
+    ) {
+      continue;
+    }
+
+    const dy =
+      line.top -
+      labelLine.bottom;
+
+    if (
+      dy >
+      maxVertical
+    ) {
+      continue;
+    }
+
+    // --------------------------------------------------------
+    // jangan mengambil baris label lain
+    // --------------------------------------------------------
+
+    if (
+      lineContainsAnyLabel(
+        line,
+        PASSPORT_ALL_LABELS
+      )
+    ) {
+      continue;
+    }
+
+    // --------------------------------------------------------
+    // overlap X
+    // --------------------------------------------------------
+
+    const overlap =
+      Math.max(
+        0,
+        Math.min(
+          line.right,
+          labelRight +
+            (options.xTolerance ?? 80)
+        ) -
+        Math.max(
+          line.left,
+          labelLeft -
+            (options.xTolerance ?? 80)
+        )
+      );
+
+    const labelWidth =
+      Math.max(
+        1,
+        labelRight -
+          labelLeft
+      );
+
+    const overlapRatio =
+      overlap /
+      Math.min(
+        labelWidth,
+        Math.max(
+          1,
+          line.right -
+            line.left
+        )
+      );
+
+    const centerDistance =
+      Math.abs(
+        line.centerX -
+        labelCenter
+      );
+
+    // --------------------------------------------------------
+    // score
+    // --------------------------------------------------------
+
+    let score = 0;
+
+    score +=
+      Math.max(
+        0,
+        100 - dy
+      );
+
+    score +=
+      overlapRatio *
+      100;
+
+    score +=
+      Math.max(
+        0,
+        80 -
+        centerDistance / 5
+      );
+
+    candidates.push({
+      line,
+      score,
+      dy
+    });
+
+  }
+
+  candidates.sort(
+    (a, b) =>
+      b.score -
+      a.score
   );
+
+  if (
+    !candidates.length
+  ) {
+    return null;
+  }
+
+  let value =
+    clean(
+      candidates[0]
+        .line
+        .text
+    );
+
+  // ----------------------------------------------------------
+  // Jangan pernah mengembalikan label template
+  // ----------------------------------------------------------
+
+  value =
+    removePassportLabels(
+      value
+    );
+
+  if (
+    !value ||
+    isPassportLabel(
+      value
+    )
+  ) {
+    return null;
+  }
+
+  return value;
 }
 
 
-// =========================================================
+// ============================================================
+// PASSPORT LABELS
+// ============================================================
+
+const PASSPORT_ALL_LABELS = [
+
+  "JENIS",
+  "TYPE",
+
+  "KODE NEGARA",
+  "COUNTRY CODE",
+
+  "NO. PASPOR",
+  "PASSPORT NO",
+
+  "NAMA LENGKAP",
+  "FULL NAME",
+
+  "KEWARGANEGARAAN",
+  "NATIONALITY",
+
+  "TGL. LAHIR",
+  "TGL LAHIR",
+  "DATE OF BIRTH",
+
+  "KELAMIN",
+  "SEX",
+
+  "TEMPAT LAHIR",
+  "PLACE OF BIRTH",
+
+  "TGL. PENGELUARAN",
+  "TGL PENGELUARAN",
+  "DATE OF ISSUE",
+
+  "TGL. HABIS BERLAKU",
+  "TGL HABIS BERLAKU",
+  "DATE OF EXPIRY",
+
+  "NO. REG.",
+  "NO REG",
+
+  "KANTOR YANG MENGELUARKAN",
+  "ISSUING OFFICE",
+  "ISSUING AUTHORITY"
+
+];
+
+
+// ============================================================
 // PASSPORT
-// =========================================================
+// ============================================================
 
 function parsePassport(
-  text,
+  rawText,
   overlay
 ) {
+
   const lines =
-    getLines(overlay);
+    getLines(
+      overlay
+    );
 
-  // -------------------------
-  // PASSPORT NUMBER
-  // -------------------------
+  // ----------------------------------------------------------
+  // NOMOR PASSPORT
+  // ----------------------------------------------------------
 
-  let nomorPassport = null;
+  let nomorPassport =
+    extractPassportBelowValue(
+      lines,
+      [
+        "NO. PASPOR",
+        "NO PASPOR",
+        "PASSPORT NO",
+        "PASSPORT NUMBER"
+      ],
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
+    );
 
-  const passLine =
-    findLine(lines, [
-      "NO. PASPOR",
-      "NO PASPOR",
-      "PASSPORT NO",
-      "PASSPORT NUMBER"
-    ]);
-
-  if (passLine) {
-    nomorPassport =
-      valueAfterLabel(
-        passLine.text,
-        [
-          "NO. PASPOR",
-          "NO PASPOR",
-          "PASSPORT NO",
-          "PASSPORT NUMBER"
-        ]
-      );
-  }
-
+  // fallback nomor passport
   if (
-    !nomorPassport ||
-    !/^[A-Z0-9]{7,10}$/i.test(
-      nomorPassport
-    )
+    !nomorPassport
   ) {
-    const matches =
-      text.match(
+
+    const candidates =
+      rawText.match(
         /\b[A-Z]\d{7}\b/gi
       ) || [];
 
-    nomorPassport =
-      matches[0] ||
-      nomorPassport;
+    if (
+      candidates.length
+    ) {
+      nomorPassport =
+        candidates[0];
+    }
+
   }
 
-  if (nomorPassport) {
+  if (
+    nomorPassport
+  ) {
+
     nomorPassport =
       nomorPassport
         .replace(
@@ -1000,145 +1743,211 @@ function parsePassport(
           ""
         )
         .toUpperCase();
+
   }
 
-  // -------------------------
+  // ----------------------------------------------------------
   // NAMA
-  // -------------------------
+  // ----------------------------------------------------------
 
   const nama =
-    getPassportField(
+    extractPassportBelowValue(
       lines,
       [
         "NAMA LENGKAP",
         "FULL NAME"
       ],
-      [
-        "KEWARGANEGARAAN",
-        "NATIONALITY"
-      ]
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // NATIONALITY
-  // -------------------------
+  // ----------------------------------------------------------
 
   const nationality =
-    getPassportField(
+    extractPassportBelowValue(
       lines,
       [
         "KEWARGANEGARAAN",
         "NATIONALITY"
       ],
-      [
-        "TGL. LAHIR",
-        "TGL LAHIR",
-        "DATE OF BIRTH"
-      ]
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // DATE OF BIRTH
-  // -------------------------
+  // ----------------------------------------------------------
 
-  const tanggalLahir =
-    getPassportDate(
+  let tanggalLahir =
+    extractPassportBelowValue(
       lines,
       [
         "TGL. LAHIR",
         "TGL LAHIR",
         "DATE OF BIRTH"
-      ]
+      ],
+      {
+        maxVertical: 100,
+        xTolerance: 90
+      }
     );
 
-  // -------------------------
-  // SEX
-  // -------------------------
+  tanggalLahir =
+    extractDateFromValue(
+      tanggalLahir
+    );
 
-  const jenisKelamin =
-    getPassportField(
+  // ----------------------------------------------------------
+  // SEX
+  // ----------------------------------------------------------
+
+  let jenisKelamin =
+    extractPassportBelowValue(
       lines,
       [
         "KELAMIN",
         "SEX"
       ],
-      [
-        "TEMPAT LAHIR",
-        "PLACE OF BIRTH"
-      ]
+      {
+        maxVertical: 100,
+        xTolerance: 90
+      }
     );
 
-  // -------------------------
-  // PLACE OF BIRTH
-  // -------------------------
+  if (
+    jenisKelamin
+  ) {
+
+    const sex =
+      normalizeUpper(
+        jenisKelamin
+      );
+
+    if (
+      sex === "M" ||
+      sex.includes("MALE")
+    ) {
+      jenisKelamin =
+        "M";
+    }
+
+    else if (
+      sex === "F" ||
+      sex.includes("FEMALE")
+    ) {
+      jenisKelamin =
+        "F";
+    }
+
+  }
+
+  // ----------------------------------------------------------
+  // TEMPAT LAHIR
+  // ----------------------------------------------------------
 
   const tempatLahir =
-    getPassportField(
+    extractPassportBelowValue(
       lines,
       [
         "TEMPAT LAHIR",
         "PLACE OF BIRTH"
       ],
-      [
-        "TGL. PENGELUARAN",
-        "DATE OF ISSUE"
-      ]
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
     );
 
-  // -------------------------
-  // DATE ISSUE
-  // -------------------------
+  // ----------------------------------------------------------
+  // DATE OF ISSUE
+  // ----------------------------------------------------------
 
-  const tanggalTerbit =
-    getPassportDate(
+  let tanggalTerbit =
+    extractPassportBelowValue(
       lines,
       [
         "TGL. PENGELUARAN",
         "TGL PENGELUARAN",
         "DATE OF ISSUE"
-      ]
+      ],
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
     );
 
-  // -------------------------
-  // EXPIRY
-  // -------------------------
+  tanggalTerbit =
+    extractDateFromValue(
+      tanggalTerbit
+    );
 
-  const expiry =
-    getPassportDate(
+  // ----------------------------------------------------------
+  // EXPIRY
+  // ----------------------------------------------------------
+
+  let expiryDate =
+    extractPassportBelowValue(
       lines,
       [
         "TGL. HABIS BERLAKU",
         "TGL HABIS BERLAKU",
         "DATE OF EXPIRY"
-      ]
+      ],
+      {
+        maxVertical: 100,
+        xTolerance: 100
+      }
     );
 
-  // -------------------------
+  expiryDate =
+    extractDateFromValue(
+      expiryDate
+    );
+
+  // ----------------------------------------------------------
   // ISSUING OFFICE
-  // -------------------------
+  // ----------------------------------------------------------
 
   const issuingAuthority =
-    getPassportField(
+    extractPassportBelowValue(
       lines,
       [
         "KANTOR YANG MENGELUARKAN",
         "ISSUING OFFICE",
         "ISSUING AUTHORITY"
       ],
-      [
-        "MRZ",
-        "NO. REG"
-      ]
+      {
+        maxVertical: 120,
+        xTolerance: 140
+      }
     );
 
-  // -------------------------
+  // ----------------------------------------------------------
   // MRZ
-  // -------------------------
+  // ----------------------------------------------------------
 
   const mrz =
-    extractMRZ(text);
+    extractMRZ(
+      rawText
+    );
+
+  // ----------------------------------------------------------
+  // MRZ QC
+  // ----------------------------------------------------------
+
+  const mrzParsed =
+    parseMRZ(
+      mrz
+    );
 
   return {
+
     document_type:
       "passport",
 
@@ -1162,319 +1971,436 @@ function parsePassport(
       tanggalTerbit,
 
     expiry_date:
-      expiry,
+      expiryDate,
 
     issuing_authority:
       issuingAuthority,
 
-    mrz
+    mrz,
+
+    mrz_data:
+      mrzParsed
+
   };
+
 }
 
 
-// =========================================================
-// PASSPORT FIELD
-// =========================================================
+// ============================================================
+// DATE FROM PASSPORT VALUE
+// ============================================================
 
-function getPassportField(
-  lines,
-  labels,
-  stopLabels
+function extractDateFromValue(
+  value
 ) {
-  const index =
-    lines.findIndex(line =>
-      labels.some(label =>
-        line.text
-          .toUpperCase()
-          .includes(
-            label.toUpperCase()
-          )
-      )
-    );
 
-  if (index < 0) {
+  if (!value) {
     return null;
   }
 
-  const line =
-    lines[index];
-
-  // Jangan mengambil label itu sendiri
-  let same =
-    valueAfterLabel(
-      line.text,
-      labels
+  const numeric =
+    value.match(
+      /\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\b/
     );
 
-  if (same) {
-    const upper =
-      same.toUpperCase();
+  if (numeric) {
 
-    // Hindari hasil seperti:
-    // / PLACE OF
-    // PLACE OF
-    if (
-      /^\/?\s*PLACE OF/i.test(
-        same
-      )
-    ) {
-      same = null;
-    }
-
-    if (
-      stopLabels.some(stop =>
-        upper.includes(
-          stop.toUpperCase()
-        )
-      )
-    ) {
-      same = null;
-    }
-  }
-
-  if (same) {
-    return clean(same);
-  }
-
-  // Cari baris setelah label
-  for (
-    let i = index + 1;
-    i <
-    Math.min(
-      lines.length,
-      index + 5
+    return normalizeDate(
+      numeric[0]
     );
-    i++
-  ) {
-    const candidate =
-      lines[i].text.trim();
 
-    if (!candidate) continue;
-
-    const isStop =
-      stopLabels.some(stop =>
-        candidate
-          .toUpperCase()
-          .includes(
-            stop.toUpperCase()
-          )
-      );
-
-    if (isStop) {
-      continue;
-    }
-
-    // Jangan ambil label bilingual
-    if (
-      /^(PLACE OF|DATE OF|NO\.?|NATIONALITY|SEX|KELAMIN|TGL\.?)/i
-        .test(candidate)
-    ) {
-      continue;
-    }
-
-    return clean(candidate);
   }
 
-  return null;
+  // contoh:
+  // 12 MAY 2010
+
+  const textual =
+    value.match(
+      /\b\d{1,2}\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\s+\d{4}\b/i
+    );
+
+  if (textual) {
+
+    return clean(
+      textual[0]
+    );
+
+  }
+
+  // kalau OCR langsung memberikan tanggal
+  return clean(value);
+
 }
 
 
-// =========================================================
-// PASSPORT DATE
-// =========================================================
+// ============================================================
+// PASSPORT LABEL TEST
+// ============================================================
 
-function getPassportDate(
-  lines,
+function isPassportLabel(
+  value
+) {
+
+  const v =
+    normalizeUpper(
+      value
+    );
+
+  if (!v) {
+    return true;
+  }
+
+  return PASSPORT_ALL_LABELS.some(
+    label => {
+
+      const l =
+        normalizeUpper(
+          label
+        );
+
+      return (
+        v === l ||
+        v.includes(l)
+      );
+
+    }
+  );
+
+}
+
+
+// ============================================================
+// REMOVE PASSPORT LABEL
+// ============================================================
+
+function removePassportLabels(
+  value
+) {
+
+  let v =
+    clean(value);
+
+  if (!v) {
+    return null;
+  }
+
+  // ----------------------------------------------------------
+  // Contoh yang sebelumnya muncul:
+  //
+  // "/ FULL NAME"
+  // "/ PLACE OF BIRTH"
+  // "/ SEX"
+  //
+  // semuanya harus ditolak.
+  // ----------------------------------------------------------
+
+  v =
+    v.replace(
+      /^\/?\s*(FULL NAME|PLACE OF BIRTH|NATIONALITY|SEX|TYPE|COUNTRY CODE)\s*$/i,
+      ""
+    );
+
+  return clean(v);
+
+}
+
+
+// ============================================================
+// LABEL DETECTION
+// ============================================================
+
+function lineContainsAnyLabel(
+  line,
   labels
 ) {
-  const index =
-    lines.findIndex(line =>
-      labels.some(label =>
-        line.text
-          .toUpperCase()
-          .includes(
-            label.toUpperCase()
-          )
+
+  return labels.some(
+    label =>
+      lineContainsLabel(
+        line,
+        [label]
       )
-    );
+  );
 
-  if (index < 0) {
-    return null;
-  }
-
-  const current =
-    lines[index].text;
-
-  let value =
-    valueAfterLabel(
-      current,
-      labels
-    );
-
-  let date =
-    value?.match(
-      /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
-    );
-
-  if (date) {
-    return normalizeDate(
-      date[0]
-    );
-  }
-
-  // OCR passport sering memakai:
-  // 01 JAN 1990
-  const monthDate =
-    value?.match(
-      /\d{1,2}\s+[A-Z]{3,9}\s+\d{4}/i
-    );
-
-  if (monthDate) {
-    return clean(
-      monthDate[0]
-    );
-  }
-
-  for (
-    let i = index + 1;
-    i <
-    Math.min(
-      lines.length,
-      index + 4
-    );
-    i++
-  ) {
-    const t =
-      lines[i].text;
-
-    date =
-      t.match(
-        /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
-      );
-
-    if (date) {
-      return normalizeDate(
-        date[0]
-      );
-    }
-
-    const md =
-      t.match(
-        /\d{1,2}\s+[A-Z]{3,9}\s+\d{4}/i
-      );
-
-    if (md) {
-      return clean(
-        md[0]
-      );
-    }
-  }
-
-  return null;
 }
 
 
-// =========================================================
-// MRZ
-// =========================================================
+// ============================================================
+// PASSPORT MRZ
+// ============================================================
 
-function extractMRZ(text) {
+function extractMRZ(
+  text
+) {
+
   const lines =
-    text
-      .split("\n")
-      .map(x =>
-        x
-          .replace(/\s/g, "")
-          .toUpperCase()
+    String(text || "")
+      .split(/\r?\n/)
+      .map(
+        x =>
+          x
+            .replace(
+              /\s+/g,
+              ""
+            )
+            .toUpperCase()
       )
       .filter(Boolean);
 
+  // Passport MRZ biasanya 44 karakter
   const candidates =
-    lines.filter(line => {
-      if (line.length < 25) {
-        return false;
+    lines.filter(
+      line => {
+
+        const chevrons =
+          (
+            line.match(
+              /</g
+            ) || []
+          ).length;
+
+        return (
+          line.length >= 30 &&
+          chevrons >= 2
+        );
+
       }
+    );
 
-      const chevrons =
-        (
-          line.match(
-            /</g
-          ) || []
-        ).length;
+  if (
+    candidates.length >= 2
+  ) {
 
-      return chevrons >= 2;
-    });
-
-  if (candidates.length >= 2) {
     return candidates
       .slice(-2)
       .join("\n");
+
   }
 
   return null;
+
 }
 
 
-// =========================================================
-// KK
-// =========================================================
+// ============================================================
+// MRZ PARSER
+// ============================================================
 
-function parseKK(
-  text,
-  overlay
+function parseMRZ(
+  mrz
 ) {
-  const lines =
-    getLines(overlay);
 
-  const noKK =
-    extract16(text);
-
-  const rows = [];
-
-  // =======================================================
-  // Cari header kolom
-  // =======================================================
-
-  let nikColumnX = null;
-  let namaColumnX = null;
-  let ayahColumnX = null;
-
-  for (const line of lines) {
-    const t =
-      line.text.toUpperCase();
-
-    if (
-      t.includes("NIK")
-    ) {
-      nikColumnX =
-        line.left;
-    }
-
-    if (
-      t === "NAMA" ||
-      t.startsWith("NAMA ")
-    ) {
-      namaColumnX =
-        line.left;
-    }
-
-    if (
-      t.includes("NAMA AYAH")
-    ) {
-      ayahColumnX =
-        line.left;
-    }
+  if (!mrz) {
+    return null;
   }
 
-  // =======================================================
-  // Cari setiap NIK
-  // =======================================================
+  const lines =
+    mrz
+      .split("\n")
+      .map(
+        x =>
+          x
+            .replace(
+              /\s/g,
+              ""
+            )
+            .toUpperCase()
+      );
+
+  if (
+    lines.length < 2
+  ) {
+    return null;
+  }
+
+  const line1 =
+    lines[0];
+
+  const line2 =
+    lines[1];
+
+  // ----------------------------------------------------------
+  // TD3 passport:
+  //
+  // line 1:
+  // P<IDO...
+  //
+  // line 2:
+  // passport number
+  // nationality
+  // DOB
+  // sex
+  // expiry
+  // ----------------------------------------------------------
+
+  const result = {
+    raw: mrz
+  };
+
+  if (
+    line1.length >= 5
+  ) {
+
+    result.document_type =
+      line1[0];
+
+    result.country =
+      line1.substring(
+        2,
+        5
+      );
+
+    const namePart =
+      line1.substring(
+        5
+      );
+
+    const nameSplit =
+      namePart.split(
+        "<<"
+      );
+
+    result.surname =
+      clean(
+        nameSplit[0]
+          ?.replace(
+            /</g,
+            " "
+          )
+      );
+
+    result.given_names =
+      clean(
+        (nameSplit[1] || "")
+          .replace(
+            /</g,
+            " "
+          )
+      );
+
+  }
+
+  if (
+    line2.length >= 20
+  ) {
+
+    result.passport_number =
+      line2
+        .substring(
+          0,
+          9
+        )
+        .replace(
+          /</g,
+          ""
+        );
+
+    result.nationality =
+      line2.substring(
+        10,
+        13
+      );
+
+    result.birth_date =
+      line2.substring(
+        13,
+        19
+      );
+
+    result.sex =
+      line2.substring(
+        20,
+        21
+      );
+
+    result.expiry_date =
+      line2.substring(
+        21,
+        27
+      );
+
+  }
+
+  return result;
+
+}
+
+
+// ============================================================
+// KK
+// ============================================================
+
+function parseKK(
+  rawText,
+  overlay
+) {
+
+  const lines =
+    getLines(
+      overlay
+    );
+
+  // ----------------------------------------------------------
+  // NO KK
+  // ----------------------------------------------------------
+
+  const all16 =
+    rawText.match(
+      /\b\d{16}\b/g
+    ) || [];
+
+  const noKK =
+    all16[0] ||
+    null;
+
+  // ----------------------------------------------------------
+  // Cari posisi header
+  // ----------------------------------------------------------
+
+  const nikHeader =
+    findLabelLine(
+      lines,
+      ["NIK"]
+    );
+
+  const namaHeader =
+    findLabelLine(
+      lines,
+      ["NAMA"]
+    );
+
+  const ayahHeader =
+    findLabelLine(
+      lines,
+      [
+        "NAMA AYAH"
+      ]
+    );
+
+  const nikX =
+    nikHeader?.centerX ??
+    null;
+
+  const namaX =
+    namaHeader?.centerX ??
+    null;
+
+  const ayahX =
+    ayahHeader?.centerX ??
+    null;
+
+  // ----------------------------------------------------------
+  // Semua NIK
+  // ----------------------------------------------------------
+
+  const rows = [];
 
   for (
     let i = 0;
     i < lines.length;
     i++
   ) {
+
     const line =
       lines[i];
 
@@ -1490,146 +2416,243 @@ function parseKK(
     const nik =
       match[0];
 
-    // -----------------------------------------------------
-    // Nama
-    // -----------------------------------------------------
+    // --------------------------------------------------------
+    // Cari line yang satu row
+    // --------------------------------------------------------
 
-    let nama = null;
+    const rowCandidates =
+      lines.filter(
+        candidate => {
 
-    // Coba same line
-    const words =
-      line.words || [];
+          if (
+            candidate === line
+          ) {
+            return false;
+          }
 
-    const nikWord =
-      words.find(w =>
-        String(
-          w.WordText || ""
-        ).replace(/\D/g, "")
-          .length >= 16
+          const dy =
+            Math.abs(
+              candidate.centerY -
+              line.centerY
+            );
+
+          return (
+            dy <= 35
+          );
+
+        }
       );
 
-    const nikX =
-      Number(
-        nikWord?.Left ??
-        line.left
+    // --------------------------------------------------------
+    // NAMA
+    // --------------------------------------------------------
+
+    let nama =
+      findNearestColumnValue(
+        rowCandidates,
+        line,
+        namaX
       );
 
-    const candidates =
-      lines.filter(l =>
-        Math.abs(
-          l.top - line.top
-        ) <=
-        Math.max(
-          25,
-          line.height * 2
-        )
-      );
-
-    // Nama berada di area kolom nama
-    if (namaColumnX != null) {
-      const c =
-        candidates.find(l =>
-          Math.abs(
-            l.left -
-            namaColumnX
-          ) < 120 &&
-          !/\b\d{16}\b/.test(
-            l.text
-          )
-        );
-
-      if (c) {
-        nama =
-          clean(c.text);
-      }
-    }
-
-    // Fallback: kata di kanan NIK
+    // fallback:
+    // cari teks di kanan NIK
     if (!nama) {
-      const c =
-        candidates.find(l =>
-          l.left > nikX + 40 &&
-          !/\b\d{16}\b/.test(
-            l.text
-          )
-        );
 
-      if (c) {
+      const right =
+        rowCandidates
+          .filter(
+            x =>
+              x.left >
+              line.right
+          )
+          .sort(
+            (a, b) =>
+              a.left -
+              b.left
+          );
+
+      if (
+        right.length
+      ) {
+
         nama =
-          clean(c.text);
+          clean(
+            right[0].text
+          );
+
       }
+
     }
 
-    // -----------------------------------------------------
-    // Nama Ayah
+    // --------------------------------------------------------
+    // NAMA AYAH
     //
-    // WAJIB berasal dari kolom Nama Ayah.
-    // BUKAN Kepala Keluarga.
-    // -----------------------------------------------------
+    // SANGAT PENTING:
+    //
+    // Tidak pernah mengambil Kepala Keluarga.
+    // Hanya dari kolom Nama Ayah.
+    // --------------------------------------------------------
 
-    let namaAyah = null;
+    let namaAyah =
+      null;
 
-    if (ayahColumnX != null) {
-      const c =
-        candidates.find(l =>
-          Math.abs(
-            l.left -
-            ayahColumnX
-          ) < 160 &&
-          !/\b\d{16}\b/.test(
-            l.text
-          )
+    if (
+      ayahX !== null
+    ) {
+
+      namaAyah =
+        findNearestColumnValue(
+          rowCandidates,
+          line,
+          ayahX
         );
 
-      if (c) {
-        namaAyah =
-          clean(c.text);
-      }
     }
 
     rows.push({
+
       nik,
-      nama,
+
+      nama:
+        clean(nama),
+
       nama_ayah:
-        namaAyah
+        clean(namaAyah)
+
     });
+
   }
 
-  // =======================================================
+  // ----------------------------------------------------------
   // DEDUPE
-  // =======================================================
+  // ----------------------------------------------------------
 
-  const map =
+  const unique =
     new Map();
 
-  for (const row of rows) {
-    if (!map.has(row.nik)) {
-      map.set(
+  for (
+    const row of rows
+  ) {
+
+    if (
+      !unique.has(
+        row.nik
+      )
+    ) {
+
+      unique.set(
         row.nik,
         row
       );
+
     }
+
   }
 
   return {
-    document_type: "kk",
 
-    no_kk: noKK,
+    document_type:
+      "kk",
+
+    no_kk:
+      noKK,
 
     members:
       Array.from(
-        map.values()
+        unique.values()
       )
+
   };
+
 }
 
 
-// =========================================================
-// GENERIC
-// =========================================================
+// ============================================================
+// KK COLUMN VALUE
+// ============================================================
 
-function parseGeneric(text) {
+function findNearestColumnValue(
+  candidates,
+  sourceLine,
+  columnX
+) {
+
+  if (
+    columnX === null ||
+    columnX === undefined
+  ) {
+    return null;
+  }
+
+  const valid =
+    candidates
+      .filter(
+        candidate => {
+
+          // Jangan ambil NIK lagi
+          if (
+            /\b\d{16}\b/.test(
+              candidate.text
+            )
+          ) {
+            return false;
+          }
+
+          const distance =
+            Math.abs(
+              candidate.centerX -
+              columnX
+            );
+
+          return (
+            distance <= 150
+          );
+
+        }
+      )
+      .sort(
+        (a, b) => {
+
+          const da =
+            Math.abs(
+              a.centerX -
+              columnX
+            );
+
+          const db =
+            Math.abs(
+              b.centerX -
+              columnX
+            );
+
+          return da - db;
+
+        }
+      );
+
+  if (
+    !valid.length
+  ) {
+    return null;
+  }
+
+  return clean(
+    valid[0].text
+  );
+
+}
+
+
+// ============================================================
+// GENERIC
+// ============================================================
+
+function parseGeneric(
+  text
+) {
+
   return {
+
     document_type:
       "unknown",
 
@@ -1638,21 +2661,49 @@ function parseGeneric(text) {
 
     raw_text_available:
       true
+
   };
+
 }
 
 
-// =========================================================
+// ============================================================
+// EXTRACT 16 DIGIT
+// ============================================================
+
+function extract16(
+  text
+) {
+
+  const values =
+    String(text || "")
+      .match(
+        /\b\d{16}\b/g
+      ) || [];
+
+  return (
+    values[0] ||
+    null
+  );
+
+}
+
+
+// ============================================================
 // VALIDATION
-// =========================================================
+// ============================================================
 
 function validate(
   type,
   data
 ) {
+
   const missing = [];
 
-  if (type === "ktp") {
+  if (
+    type === "ktp"
+  ) {
+
     if (!data.nik)
       missing.push("NIK");
 
@@ -1673,28 +2724,94 @@ function validate(
       missing.push(
         "Jenis Kelamin"
       );
+
   }
 
-  if (type === "passport") {
-    if (!data.nomor_passport)
+  if (
+    type === "passport"
+  ) {
+
+    if (
+      !data.nomor_passport
+    ) {
       missing.push(
         "Nomor Passport"
       );
+    }
 
-    if (!data.nama)
-      missing.push("Nama");
+    if (!data.nama) {
+      missing.push(
+        "Nama"
+      );
+    }
 
-    if (!data.tanggal_lahir)
+    if (
+      !data.nationality
+    ) {
+      missing.push(
+        "Nationality"
+      );
+    }
+
+    if (
+      !data.tanggal_lahir
+    ) {
       missing.push(
         "Tanggal Lahir"
       );
+    }
+
+    if (
+      !data.tempat_lahir
+    ) {
+      missing.push(
+        "Tempat Lahir"
+      );
+    }
+
+    if (
+      !data.jenis_kelamin
+    ) {
+      missing.push(
+        "Jenis Kelamin"
+      );
+    }
+
+    if (
+      !data.tanggal_terbit
+    ) {
+      missing.push(
+        "Tanggal Terbit"
+      );
+    }
+
+    if (
+      !data.expiry_date
+    ) {
+      missing.push(
+        "Tanggal Expired"
+      );
+    }
+
+    if (
+      !data.issuing_authority
+    ) {
+      missing.push(
+        "Issuing Office"
+      );
+    }
+
   }
 
-  if (type === "kk") {
-    if (!data.no_kk)
+  if (
+    type === "kk"
+  ) {
+
+    if (!data.no_kk) {
       missing.push(
         "No. KK"
       );
+    }
 
     if (
       !data.members ||
@@ -1704,12 +2821,16 @@ function validate(
         "Data anggota KK"
       );
     }
+
   }
 
   return {
+
     valid:
       missing.length === 0,
 
     missing
+
   };
+
 }
