@@ -1,7 +1,7 @@
 module.exports = async function handler(req, res) {
   // =========================================================
-  // JNI TRAVEL - OCR API
-  // OCR ENGINE: OCR.SPACE
+  // JNI TRAVEL OCR
+  // OCR.SPACE - FREE
   // =========================================================
 
   if (req.method !== "POST") {
@@ -13,10 +13,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // =======================================================
-    // 1. API KEY
-    // =======================================================
-
     const apiKey = process.env.OCR_SPACE_API_KEY;
 
     if (!apiKey) {
@@ -25,10 +21,6 @@ module.exports = async function handler(req, res) {
         error: "OCR_SPACE_API_KEY belum tersedia di Vercel."
       });
     }
-
-    // =======================================================
-    // 2. DATA DARI FRONTEND
-    // =======================================================
 
     const {
       documentType,
@@ -44,26 +36,22 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // =======================================================
-    // 3. VALIDASI FORMAT
-    // =======================================================
-
     const allowedTypes = [
       "image/jpeg",
       "image/png",
-      "image/webp",
       "application/pdf"
     ];
 
-    if (mimeType && !allowedTypes.includes(mimeType)) {
+    if (!allowedTypes.includes(mimeType)) {
       return res.status(400).json({
         ok: false,
-        error: `Format file tidak didukung: ${mimeType}`
+        error:
+          "Format tidak didukung. Gunakan JPG, PNG, atau PDF."
       });
     }
 
     // =======================================================
-    // 4. DATA URL
+    // DATA URL
     // =======================================================
 
     const match = dataUrl.match(
@@ -73,7 +61,7 @@ module.exports = async function handler(req, res) {
     if (!match) {
       return res.status(400).json({
         ok: false,
-        error: "Format data file tidak valid."
+        error: "Format file tidak valid."
       });
     }
 
@@ -81,37 +69,23 @@ module.exports = async function handler(req, res) {
     const base64Data = match[2];
 
     // =======================================================
-    // 5. LIMIT FILE OCR.SPACE FREE
+    // LIMIT FREE OCR.SPACE = 1 MB
     // =======================================================
 
     const fileSizeBytes = Math.ceil(
       (base64Data.length * 3) / 4
     );
 
-    const MAX_BYTES = 1 * 1024 * 1024;
-
-    if (fileSizeBytes > MAX_BYTES) {
+    if (fileSizeBytes > 1024 * 1024) {
       return res.status(400).json({
         ok: false,
         error:
-          "Ukuran file lebih dari 1 MB. Kompres file terlebih dahulu."
+          "File lebih dari 1 MB. Kompres gambar terlebih dahulu."
       });
     }
 
     // =======================================================
-    // 6. WEBP
-    // =======================================================
-
-    if (detectedMime === "image/webp") {
-      return res.status(400).json({
-        ok: false,
-        error:
-          "WEBP belum didukung langsung oleh OCR.space. Gunakan JPG atau PNG."
-      });
-    }
-
-    // =======================================================
-    // 7. REQUEST OCR.SPACE
+    // FORM OCR.SPACE
     // =======================================================
 
     const form = new FormData();
@@ -121,13 +95,37 @@ module.exports = async function handler(req, res) {
       `data:${detectedMime};base64,${base64Data}`
     );
 
-    form.append("language", "eng");
+    // Engine 2
     form.append("OCREngine", "2");
-    form.append("isOverlayRequired", "false");
+
+    // Auto detect language
+    form.append("language", "auto");
+
+    // WAJIB untuk parser posisi
+    form.append("isOverlayRequired", "true");
+
+    // Auto rotate
     form.append("detectOrientation", "true");
+
+    // Upscaling
     form.append("scale", "true");
 
-    const ocrResponse = await fetch(
+    // KK adalah tabel
+    if (
+      String(documentType || "")
+        .toLowerCase()
+        .includes("kk")
+    ) {
+      form.append("isTable", "true");
+    } else {
+      form.append("isTable", "false");
+    }
+
+    // =======================================================
+    // CALL OCR.SPACE
+    // =======================================================
+
+    const response = await fetch(
       "https://api.ocr.space/parse/image",
       {
         method: "POST",
@@ -138,101 +136,109 @@ module.exports = async function handler(req, res) {
       }
     );
 
-    const rawResponse = await ocrResponse.text();
+    const raw = await response.text();
 
-    let ocrResult;
+    let result;
 
     try {
-      ocrResult = JSON.parse(rawResponse);
+      result = JSON.parse(raw);
     } catch {
       return res.status(502).json({
         ok: false,
-        error: "OCR.space mengembalikan response bukan JSON.",
-        httpStatus: ocrResponse.status,
-        raw: rawResponse.substring(0, 2000)
+        error:
+          "OCR.space mengembalikan response bukan JSON.",
+        httpStatus: response.status,
+        raw: raw.substring(0, 2000)
       });
     }
 
-    // =======================================================
-    // 8. ERROR OCR.SPACE
-    // =======================================================
-
-    if (!ocrResponse.ok) {
+    if (!response.ok) {
       return res.status(502).json({
         ok: false,
         error: "OCR.space API error.",
-        httpStatus: ocrResponse.status,
-        details: ocrResult
+        httpStatus: response.status,
+        details: result
       });
     }
 
-    if (ocrResult.IsErroredOnProcessing) {
+    if (result.IsErroredOnProcessing) {
       return res.status(422).json({
         ok: false,
         error:
-          ocrResult.ErrorMessage ||
+          result.ErrorMessage ||
           "OCR gagal memproses dokumen.",
-        details: ocrResult.ErrorDetails || null
+        details:
+          result.ErrorDetails || null
       });
     }
 
     // =======================================================
-    // 9. AMBIL SEMUA HASIL OCR
+    // PARSED RESULTS
     // =======================================================
 
-    const parsedResults = Array.isArray(
-      ocrResult.ParsedResults
-    )
-      ? ocrResult.ParsedResults
-      : [];
+    const parsedResults =
+      Array.isArray(result.ParsedResults)
+        ? result.ParsedResults
+        : [];
+
+    if (!parsedResults.length) {
+      return res.status(422).json({
+        ok: false,
+        error: "OCR tidak menghasilkan halaman."
+      });
+    }
 
     const rawText = parsedResults
-      .map(item => item?.ParsedText || "")
+      .map(x => x?.ParsedText || "")
       .filter(Boolean)
       .join("\n");
+
+    const overlay = parsedResults
+      .map(x => x?.TextOverlay || null)
+      .filter(Boolean);
 
     if (!rawText.trim()) {
       return res.status(422).json({
         ok: false,
-        error: "OCR selesai tetapi tidak menemukan teks."
+        error:
+          "OCR selesai tetapi teks tidak ditemukan."
       });
     }
 
-    const text = normalizeText(rawText);
-
     // =======================================================
-    // 10. TENTUKAN JENIS DOKUMEN
+    // DETEKSI JENIS DOKUMEN
     // =======================================================
 
-    const type = normalizeDocumentType(
+    const type = detectDocumentType(
       documentType,
-      text
+      rawText
     );
 
     // =======================================================
-    // 11. PARSER
+    // PARSER
     // =======================================================
 
-    let data = {};
+    let data;
 
     if (type === "ktp") {
-      data = parseKTP(text);
-    } else if (type === "kk") {
-      data = parseKK(text);
+      data = parseKTP(rawText, overlay);
     } else if (type === "passport") {
-      data = parsePassport(text);
+      data = parsePassport(rawText, overlay);
+    } else if (type === "kk") {
+      data = parseKK(rawText, overlay);
     } else {
-      data = parseGeneric(text);
+      data = parseGeneric(rawText);
     }
 
     // =======================================================
-    // 12. VALIDATION
+    // VALIDATION
     // =======================================================
 
-    const validation = validateData(type, data);
+    const validation =
+      validate(type, data);
 
     // =======================================================
-    // 13. RESPONSE
+    // RESPONSE
     // =======================================================
 
     return res.status(200).json({
@@ -248,92 +254,88 @@ module.exports = async function handler(req, res) {
 
       rawText,
 
+      overlay,
+
       ocr: {
         engine: 2,
-        exitCode: ocrResult.OCRExitCode || null,
+        exitCode:
+          result.OCRExitCode || null,
+
         processingTimeMs:
-          ocrResult.ProcessingTimeInMilliseconds || null,
-        pages: parsedResults.length
+          result.ProcessingTimeInMilliseconds ||
+          null,
+
+        pages:
+          parsedResults.length
       }
     });
 
   } catch (error) {
-    console.error("JNI OCR ERROR:", error);
+    console.error(
+      "JNI OCR ERROR:",
+      error
+    );
 
     return res.status(500).json({
       ok: false,
-      error: "Terjadi error pada server OCR.",
-      details: error?.message || String(error)
+      error:
+        "Terjadi error pada server OCR.",
+      details:
+        error?.message ||
+        String(error)
     });
   }
 };
 
 
 // =========================================================
-// NORMALIZE TEXT
+// DOCUMENT TYPE
 // =========================================================
 
-function normalizeText(value) {
-  return String(value || "")
-    .replace(/\r/g, "")
-    .replace(/\u00a0/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
+function detectDocumentType(input, text) {
+  const v = String(input || "")
+    .toLowerCase();
 
-
-// =========================================================
-// NORMALIZE DOCUMENT TYPE
-// =========================================================
-
-function normalizeDocumentType(input, text) {
-  const value = String(input || "")
-    .toLowerCase()
-    .trim();
-
-  if (
-    value.includes("ktp") ||
-    value.includes("identity")
-  ) {
+  if (v.includes("ktp")) {
     return "ktp";
   }
 
   if (
-    value === "kk" ||
-    value.includes("kartu keluarga") ||
-    value.includes("family")
+    v === "kk" ||
+    v.includes("kartu keluarga")
   ) {
     return "kk";
   }
 
   if (
-    value.includes("passport") ||
-    value.includes("paspor")
+    v.includes("passport") ||
+    v.includes("paspor")
   ) {
     return "passport";
   }
 
-  // fallback otomatis
-  if (
-    /\bNIK\b/i.test(text) &&
-    /Nama/i.test(text)
-  ) {
-    return "ktp";
-  }
+  const t = text.toUpperCase();
 
   if (
-    /KARTU KELUARGA/i.test(text) ||
-    /Nama Ayah/i.test(text)
+    t.includes("KARTU KELUARGA") ||
+    t.includes("NAMA AYAH")
   ) {
     return "kk";
   }
 
   if (
-    /PASSPORT/i.test(text) ||
-    /P<O/i.test(text)
+    t.includes("PASPOR") ||
+    t.includes("PASSPORT") ||
+    t.includes("NO. PASPOR")
   ) {
     return "passport";
+  }
+
+  if (
+    t.includes("NIK") &&
+    t.includes("TEMPAT/TGL LAHIR")
+  ) {
+    return "ktp";
   }
 
   return "unknown";
@@ -341,191 +343,139 @@ function normalizeDocumentType(input, text) {
 
 
 // =========================================================
-// CLEAN VALUE
+// NORMALIZE
 // =========================================================
 
-function cleanValue(value) {
+function clean(value) {
   if (!value) return null;
 
   return String(value)
     .replace(/\s+/g, " ")
-    .replace(/^[:\-–—\s]+/, "")
-    .replace(/[:\-–—\s]+$/, "")
+    .replace(/^[\s:;,\-–—]+/, "")
+    .replace(/[\s:;,\-–—]+$/, "")
     .trim() || null;
 }
 
 
 // =========================================================
-// DATE NORMALIZER
+// DATE
 // =========================================================
 
 function normalizeDate(value) {
   if (!value) return null;
 
-  let v = value
-    .replace(/\s+/g, " ")
-    .trim();
+  const v = clean(value);
 
-  // DD-MM-YYYY
-  let m = v.match(
-    /\b(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})\b/
+  if (!v) return null;
+
+  const m = v.match(
+    /\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/
   );
 
   if (m) {
-    return `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}-${m[3]}`;
+    return (
+      m[1].padStart(2, "0") +
+      "-" +
+      m[2].padStart(2, "0") +
+      "-" +
+      m[3]
+    );
   }
 
-  // DD MONTH YYYY
-  const months = {
-    JANUARI: "01",
-    FEBRUARI: "02",
-    MARET: "03",
-    APRIL: "04",
-    MEI: "05",
-    JUNI: "06",
-    JULI: "07",
-    AGUSTUS: "08",
-    SEPTEMBER: "09",
-    OKTOBER: "10",
-    NOVEMBER: "11",
-    DESEMBER: "12",
-
-    JANUARY: "01",
-    FEBRUARY: "02",
-    MARCH: "03",
-    MAY: "05",
-    JUNE: "06",
-    JULY: "07",
-    AUGUST: "08",
-    OCTOBER: "10",
-    DECEMBER: "12"
-  };
-
-  const monthRegex = Object.keys(months).join("|");
-
-  const monthMatch = v.match(
-    new RegExp(
-      `\\b(\\d{1,2})\\s+(${monthRegex})\\s+(\\d{4})\\b`,
-      "i"
-    )
-  );
-
-  if (monthMatch) {
-    return `${monthMatch[1].padStart(2, "0")}-${months[monthMatch[2].toUpperCase()]}-${monthMatch[3]}`;
-  }
-
-  return cleanValue(v);
+  return v;
 }
 
 
 // =========================================================
-// NIK
+// OCR LINES
 // =========================================================
 
-function extractNIK(text) {
-  const matches =
-    text.match(/\b\d{16}\b/g) || [];
+function getLines(overlay) {
+  const all = [];
 
-  if (matches.length === 0) {
-    return null;
-  }
-
-  return matches[0];
-}
-
-
-// =========================================================
-// KK NUMBER
-// =========================================================
-
-function extractKKNumber(text) {
-  const lines = text.split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (
-      /NO\.?\s*KK/i.test(line) ||
-      /NOMOR\s*KARTU\s*KELUARGA/i.test(line)
+  for (const page of overlay || []) {
+    for (
+      const line of page?.Lines || []
     ) {
-      const sameLine =
-        line.match(/\b\d{16}\b/);
+      const words =
+        line?.Words || [];
 
-      if (sameLine) {
-        return sameLine[0];
-      }
+      if (!words.length) continue;
 
-      const nextLine =
-        lines[i + 1]?.match(/\b\d{16}\b/);
+      const sorted =
+        [...words].sort(
+          (a, b) =>
+            Number(a.Left || 0) -
+            Number(b.Left || 0)
+        );
 
-      if (nextLine) {
-        return nextLine[0];
-      }
+      const text = sorted
+        .map(x =>
+          String(
+            x.WordText || ""
+          )
+        )
+        .join(" ")
+        .trim();
+
+      all.push({
+        text,
+        words: sorted,
+        top: Number(
+          line.MinTop || 0
+        ),
+        height: Number(
+          line.MaxHeight || 0
+        ),
+        left: Number(
+          sorted[0]?.Left || 0
+        ),
+        right:
+          Math.max(
+            ...sorted.map(
+              x =>
+                Number(x.Left || 0) +
+                Number(x.Width || 0)
+            )
+          )
+      });
     }
   }
 
-  // fallback
-  return extractNIK(text);
+  return all;
 }
 
 
 // =========================================================
-// LABEL VALUE
+// FIND VALUE ON SAME LINE
 // =========================================================
 
-function extractAfterLabel(
-  text,
-  labels,
-  stopLabels = []
+function valueAfterLabel(
+  lineText,
+  labels
 ) {
-  const lines = text.split("\n");
+  const upper =
+    lineText.toUpperCase();
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    for (const label of labels) {
-      const regex = new RegExp(
-        `^${label}\\s*[:.]?\\s*(.*)$`,
-        "i"
+  for (const label of labels) {
+    const idx =
+      upper.indexOf(
+        label.toUpperCase()
       );
 
-      const match = line.match(regex);
+    if (idx < 0) continue;
 
-      if (!match) continue;
+    let value =
+      lineText.substring(
+        idx + label.length
+      );
 
-      let value = match[1]?.trim();
+    value = value
+      .replace(/^[\s:.\-–—]+/, "")
+      .trim();
 
-      if (value) {
-        // Kalau ada label berikutnya di baris yang sama,
-        // potong di sana.
-        for (const stop of stopLabels) {
-          const stopRegex = new RegExp(
-            `\\s+${stop}\\s*[:.]?`,
-            "i"
-          );
-
-          value = value.split(stopRegex)[0];
-        }
-
-        return cleanValue(value);
-      }
-
-      // value ada di baris berikutnya
-      if (lines[i + 1]) {
-        let next = lines[i + 1].trim();
-
-        if (
-          next &&
-          !stopLabels.some(label2 =>
-            new RegExp(
-              `^${label2}\\s*[:.]?`,
-              "i"
-            ).test(next)
-          )
-        ) {
-          return cleanValue(next);
-        }
-      }
+    if (value) {
+      return clean(value);
     }
   }
 
@@ -534,208 +484,354 @@ function extractAfterLabel(
 
 
 // =========================================================
-// JENIS KELAMIN
+// FIND LINE BY LABEL
 // =========================================================
 
-function extractGender(text) {
-  const value = extractAfterLabel(
-    text,
-    [
-      "Jenis Kelamin",
-      "Jenis Kelamın"
-    ],
-    [
-      "Gol\\. Darah",
-      "Alamat",
-      "RT/RW"
-    ]
+function findLine(
+  lines,
+  labels
+) {
+  return lines.find(line =>
+    labels.some(label =>
+      line.text
+        .toUpperCase()
+        .includes(
+          label.toUpperCase()
+        )
+    )
   );
-
-  if (!value) return null;
-
-  if (/LAKI/i.test(value)) {
-    return "LAKI-LAKI";
-  }
-
-  if (/PEREMPUAN/i.test(value)) {
-    return "PEREMPUAN";
-  }
-
-  return value;
 }
 
 
 // =========================================================
-// KTP PARSER
+// FIND NEXT VALUE LINE
 // =========================================================
 
-function parseKTP(text) {
-  const nik = extractNIK(text);
+function nextMeaningfulLine(
+  lines,
+  index,
+  labels
+) {
+  for (
+    let i = index + 1;
+    i < Math.min(
+      lines.length,
+      index + 4
+    );
+    i++
+  ) {
+    const text =
+      lines[i].text.trim();
 
-  const nama = extractAfterLabel(
-    text,
-    ["Nama"],
-    [
-      "Tempat/Tgl Lahir",
-      "Tempat / Tgl Lahir",
-      "Jenis Kelamin",
-      "Alamat"
-    ]
-  );
+    if (!text) continue;
 
-  let birthPlace = null;
-  let birthDate = null;
-
-  const ttlLabels = [
-    "Tempat/Tgl Lahir",
-    "Tempat / Tgl Lahir",
-    "Tempat/Tgl. Lahir",
-    "Tempat / Tgl. Lahir"
-  ];
-
-  const lines = text.split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (
-      ttlLabels.some(label =>
-        line.toLowerCase().includes(label.toLowerCase())
-      )
-    ) {
-      let value = line;
-
-      for (const label of ttlLabels) {
-        value = value.replace(
-          new RegExp(label, "i"),
-          ""
-        );
-      }
-
-      value = value
-        .replace(/^[:.\-\s]+/, "")
-        .trim();
-
-      // Contoh:
-      // BEKASI, 14-10-1999
-      const dateMatch = value.match(
-        /(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4})/
+    const isLabel =
+      labels.some(label =>
+        text
+          .toUpperCase()
+          .includes(
+            label.toUpperCase()
+          )
       );
 
-      if (dateMatch) {
-        birthDate = normalizeDate(
-          dateMatch[1]
-        );
-
-        birthPlace = cleanValue(
-          value
-            .replace(dateMatch[1], "")
-            .replace(/[,|-]\s*$/, "")
-        );
-      } else if (lines[i + 1]) {
-        const next = lines[i + 1];
-
-        const nextDate = next.match(
-          /(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4})/
-        );
-
-        if (nextDate) {
-          birthDate = normalizeDate(
-            nextDate[1]
-          );
-
-          birthPlace = cleanValue(
-            next
-              .replace(nextDate[1], "")
-              .replace(/[,|-]\s*$/, "")
-          );
-        }
-      }
-
-      break;
+    if (!isLabel) {
+      return text;
     }
   }
 
-  const gender = extractGender(text);
+  return null;
+}
 
-  const alamat = extractAfterLabel(
-    text,
-    ["Alamat"],
-    [
-      "RT/RW",
-      "Kel/Desa",
-      "Kelurahan/Desa",
-      "Kecamatan",
-      "Agama",
-      "Status Perkawinan"
-    ]
-  );
 
-  const rtRw = extractAfterLabel(
-    text,
-    ["RT/RW"],
-    [
-      "Kel/Desa",
-      "Kelurahan/Desa",
-      "Kecamatan"
-    ]
-  );
+// =========================================================
+// EXTRACT 16 DIGIT
+// =========================================================
 
-  const kelurahan = extractAfterLabel(
-    text,
-    [
-      "Kel/Desa",
-      "Kelurahan/Desa"
-    ],
-    [
-      "Kecamatan",
-      "Agama",
-      "Status Perkawinan"
-    ]
-  );
+function extract16(text) {
+  const found =
+    text.match(
+      /\b\d{16}\b/g
+    ) || [];
 
-  const kecamatan = extractAfterLabel(
-    text,
-    ["Kecamatan"],
-    [
-      "Agama",
-      "Status Perkawinan",
-      "Pekerjaan",
-      "Kewarganegaraan"
-    ]
-  );
+  return found[0] || null;
+}
 
-  const statusPerkawinan = extractAfterLabel(
-    text,
-    ["Status Perkawinan"],
-    [
-      "Pekerjaan",
-      "Kewarganegaraan"
-    ]
-  );
 
-  const pekerjaan = extractAfterLabel(
-    text,
-    ["Pekerjaan"],
-    [
-      "Kewarganegaraan",
-      "Berlaku Hingga"
-    ]
-  );
+// =========================================================
+// KTP
+// =========================================================
 
-  const kewarganegaraan = extractAfterLabel(
-    text,
-    [
-      "Kewarganegaraan",
-      "Kewarganegaraan"
-    ],
-    [
-      "Berlaku Hingga"
-    ]
-  );
+function parseKTP(
+  text,
+  overlay
+) {
+  const lines =
+    getLines(overlay);
 
-  // Kota/Kabupaten & Provinsi
-  const wilayah = extractKTPWilayah(text);
+  // -------------------------
+  // NIK
+  // -------------------------
+
+  const nik =
+    extract16(text);
+
+  // -------------------------
+  // NAMA
+  // -------------------------
+
+  let nama = null;
+
+  const namaLine =
+    findLine(lines, ["NAMA"]);
+
+  if (namaLine) {
+    nama =
+      valueAfterLabel(
+        namaLine.text,
+        ["NAMA"]
+      );
+  }
+
+  // -------------------------
+  // TEMPAT / TGL LAHIR
+  // -------------------------
+
+  let tempatLahir = null;
+  let tanggalLahir = null;
+
+  const ttlIndex =
+    lines.findIndex(line =>
+      /TEMPAT\s*\/?\s*TGL|TEMPAT\/TGL|TEMPAT\/TGL\.|TEMPAT.*LAHIR/i
+        .test(line.text)
+    );
+
+  if (ttlIndex >= 0) {
+    const current =
+      lines[ttlIndex].text;
+
+    let value =
+      valueAfterLabel(
+        current,
+        [
+          "TEMPAT/TGL LAHIR",
+          "TEMPAT / TGL LAHIR",
+          "TEMPAT/TGL. LAHIR",
+          "TEMPAT / TGL. LAHIR"
+        ]
+      );
+
+    if (!value) {
+      value =
+        nextMeaningfulLine(
+          lines,
+          ttlIndex,
+          [
+            "JENIS KELAMIN",
+            "ALAMAT",
+            "RT/RW"
+          ]
+        );
+    }
+
+    if (value) {
+      const date =
+        value.match(
+          /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
+        );
+
+      if (date) {
+        tanggalLahir =
+          normalizeDate(
+            date[0]
+          );
+
+        tempatLahir =
+          clean(
+            value
+              .replace(
+                date[0],
+                ""
+              )
+              .replace(
+                /[,|]+$/,
+                ""
+              )
+          );
+      } else {
+        // Cari tanggal pada baris berikut
+        for (
+          let i = ttlIndex;
+          i <
+          Math.min(
+            lines.length,
+            ttlIndex + 3
+          );
+          i++
+        ) {
+          const d =
+            lines[i].text.match(
+              /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
+            );
+
+          if (d) {
+            tanggalLahir =
+              normalizeDate(
+                d[0]
+              );
+
+            break;
+          }
+        }
+
+        tempatLahir =
+          clean(value);
+      }
+    }
+  }
+
+  // -------------------------
+  // JENIS KELAMIN
+  // -------------------------
+
+  let jenisKelamin = null;
+
+  const genderLine =
+    findLine(lines, [
+      "JENIS KELAMIN"
+    ]);
+
+  if (genderLine) {
+    jenisKelamin =
+      valueAfterLabel(
+        genderLine.text,
+        ["JENIS KELAMIN"]
+      );
+
+    if (
+      jenisKelamin &&
+      /LAKI/i.test(
+        jenisKelamin
+      )
+    ) {
+      jenisKelamin =
+        "LAKI-LAKI";
+    }
+
+    if (
+      jenisKelamin &&
+      /PEREMPUAN/i.test(
+        jenisKelamin
+      )
+    ) {
+      jenisKelamin =
+        "PEREMPUAN";
+    }
+  }
+
+  // -------------------------
+  // ALAMAT
+  // -------------------------
+
+  const alamat =
+    getField(
+      lines,
+      [
+        "ALAMAT"
+      ],
+      [
+        "RT/RW",
+        "KEL/DESA",
+        "KELURAHAN/DESA",
+        "KECAMATAN"
+      ]
+    );
+
+  // -------------------------
+  // RT/RW
+  // -------------------------
+
+  const rtRw =
+    getField(
+      lines,
+      ["RT/RW"],
+      [
+        "KEL/DESA",
+        "KELURAHAN/DESA",
+        "KECAMATAN"
+      ]
+    );
+
+  // -------------------------
+  // KELURAHAN
+  // -------------------------
+
+  const kelurahan =
+    getField(
+      lines,
+      [
+        "KEL/DESA",
+        "KELURAHAN/DESA"
+      ],
+      [
+        "KECAMATAN"
+      ]
+    );
+
+  // -------------------------
+  // KECAMATAN
+  // -------------------------
+
+  const kecamatan =
+    getField(
+      lines,
+      ["KECAMATAN"],
+      [
+        "AGAMA",
+        "STATUS PERKAWINAN",
+        "PEKERJAAN"
+      ]
+    );
+
+  // -------------------------
+  // STATUS PERKAWINAN
+  // -------------------------
+
+  const statusPerkawinan =
+    getField(
+      lines,
+      ["STATUS PERKAWINAN"],
+      [
+        "PEKERJAAN",
+        "KEWARGANEGARAAN"
+      ]
+    );
+
+  // -------------------------
+  // PEKERJAAN
+  // -------------------------
+
+  const pekerjaan =
+    getField(
+      lines,
+      ["PEKERJAAN"],
+      [
+        "KEWARGANEGARAAN",
+        "BERLAKU HINGGA"
+      ]
+    );
+
+  // -------------------------
+  // KEWARGANEGARAAN
+  // -------------------------
+
+  const kewarganegaraan =
+    getField(
+      lines,
+      ["KEWARGANEGARAAN"],
+      [
+        "BERLAKU HINGGA"
+      ]
+    );
 
   return {
     document_type: "ktp",
@@ -744,25 +840,27 @@ function parseKTP(text) {
 
     nama,
 
-    tempat_lahir: birthPlace,
+    tempat_lahir:
+      tempatLahir,
 
-    tanggal_lahir: birthDate,
+    tanggal_lahir:
+      tanggalLahir,
 
-    jenis_kelamin: gender,
+    jenis_kelamin:
+      jenisKelamin,
 
     alamat,
 
-    rt_rw: rtRw,
+    rt_rw:
+      rtRw,
 
-    kelurahan_desa: kelurahan,
+    kelurahan_desa:
+      kelurahan,
 
     kecamatan,
 
-    kabupaten_kota: wilayah.kabupaten_kota,
-
-    provinsi: wilayah.provinsi,
-
-    status_perkawinan: statusPerkawinan,
+    status_perkawinan:
+      statusPerkawinan,
 
     pekerjaan,
 
@@ -772,308 +870,302 @@ function parseKTP(text) {
 
 
 // =========================================================
-// WILAYAH KTP
+// GENERIC FIELD
 // =========================================================
 
-function extractKTPWilayah(text) {
-  const lines = text.split("\n");
-
-  let kabupaten = null;
-  let provinsi = null;
-
-  for (const line of lines) {
-    const value = line.trim();
-
-    if (/^PROVINSI\b/i.test(value)) {
-      provinsi = cleanValue(
-        value.replace(/^PROVINSI/i, "")
-      );
-    }
-
-    if (
-      /^KABUPATEN\b/i.test(value) ||
-      /^KOTA\b/i.test(value)
-    ) {
-      kabupaten = cleanValue(value);
-    }
-  }
-
-  return {
-    kabupaten_kota: kabupaten,
-    provinsi
-  };
-}
-
-
-// =========================================================
-// KK PARSER
-// =========================================================
-
-function parseKK(text) {
-  const noKK = extractKKNumber(text);
-
-  const rows = parseKKRows(text);
-
-  return {
-    document_type: "kk",
-
-    no_kk: noKK,
-
-    members: rows
-  };
-}
-
-
-// =========================================================
-// KK ROW PARSER
-//
-// Fokus:
-// NO KK
-// NIK
-// NAMA
-// NAMA AYAH
-//
-// Tidak mengambil:
-// pekerjaan
-// agama
-// status perkawinan
-// hubungan keluarga
-// =========================================================
-
-function parseKKRows(text) {
-  const lines = text
-    .split("\n")
-    .map(x => x.trim())
-    .filter(Boolean);
-
-  const results = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    const nikMatch =
-      line.match(/\b\d{16}\b/);
-
-    if (!nikMatch) continue;
-
-    const nik = nikMatch[0];
-
-    let nama = null;
-    let namaAyah = null;
-
-    // Cari nama di baris sekitar NIK.
-    // OCR KK sering membuat kolom menjadi
-    // baris-baris terpisah.
-    const nearby = lines.slice(
-      Math.max(0, i - 3),
-      Math.min(lines.length, i + 5)
+function getField(
+  lines,
+  labels,
+  stopLabels
+) {
+  const index =
+    lines.findIndex(line =>
+      labels.some(label =>
+        line.text
+          .toUpperCase()
+          .includes(
+            label.toUpperCase()
+          )
+      )
     );
 
-    // Coba format eksplisit:
-    // Nama : XXX
-    for (const candidate of nearby) {
-      const nameMatch = candidate.match(
-        /^Nama\s*[:.]?\s*(.+)$/i
-      );
+  if (index < 0) {
+    return null;
+  }
 
-      if (nameMatch) {
-        nama = cleanValue(
-          nameMatch[1]
-        );
-      }
+  const line =
+    lines[index];
 
-      const fatherMatch = candidate.match(
-        /^Nama Ayah\s*[:.]?\s*(.+)$/i
-      );
+  let value =
+    valueAfterLabel(
+      line.text,
+      labels
+    );
 
-      if (fatherMatch) {
-        namaAyah = cleanValue(
-          fatherMatch[1]
-        );
+  if (value) {
+    // Potong kalau ada label berikutnya
+    for (
+      const stop of stopLabels
+    ) {
+      const pos =
+        value
+          .toUpperCase()
+          .indexOf(
+            stop.toUpperCase()
+          );
+
+      if (pos >= 0) {
+        value =
+          value.substring(
+            0,
+            pos
+          ).trim();
       }
     }
 
-    results.push({
-      nik,
-      nama,
-      nama_ayah: namaAyah
-    });
+    if (value) {
+      return clean(value);
+    }
   }
 
-  return dedupeKKMembers(results);
+  return clean(
+    nextMeaningfulLine(
+      lines,
+      index,
+      stopLabels
+    )
+  );
 }
 
 
 // =========================================================
-// DEDUPE KK
+// PASSPORT
 // =========================================================
 
-function dedupeKKMembers(rows) {
-  const map = new Map();
+function parsePassport(
+  text,
+  overlay
+) {
+  const lines =
+    getLines(overlay);
 
-  for (const row of rows) {
-    if (!row.nik) continue;
+  // -------------------------
+  // PASSPORT NUMBER
+  // -------------------------
 
-    if (!map.has(row.nik)) {
-      map.set(row.nik, row);
-    } else {
-      const old = map.get(row.nik);
+  let nomorPassport = null;
 
-      map.set(row.nik, {
-        nik: row.nik,
-        nama: old.nama || row.nama,
-        nama_ayah:
-          old.nama_ayah ||
-          row.nama_ayah ||
-          null
-      });
-    }
+  const passLine =
+    findLine(lines, [
+      "NO. PASPOR",
+      "NO PASPOR",
+      "PASSPORT NO",
+      "PASSPORT NUMBER"
+    ]);
+
+  if (passLine) {
+    nomorPassport =
+      valueAfterLabel(
+        passLine.text,
+        [
+          "NO. PASPOR",
+          "NO PASPOR",
+          "PASSPORT NO",
+          "PASSPORT NUMBER"
+        ]
+      );
   }
 
-  return Array.from(map.values());
-}
+  if (
+    !nomorPassport ||
+    !/^[A-Z0-9]{7,10}$/i.test(
+      nomorPassport
+    )
+  ) {
+    const matches =
+      text.match(
+        /\b[A-Z]\d{7}\b/gi
+      ) || [];
 
+    nomorPassport =
+      matches[0] ||
+      nomorPassport;
+  }
 
-// =========================================================
-// PASSPORT PARSER
-// =========================================================
+  if (nomorPassport) {
+    nomorPassport =
+      nomorPassport
+        .replace(
+          /[^A-Z0-9]/gi,
+          ""
+        )
+        .toUpperCase();
+  }
 
-function parsePassport(text) {
-  const passportNumber =
-    extractPassportNumber(text);
+  // -------------------------
+  // NAMA
+  // -------------------------
+
+  const nama =
+    getPassportField(
+      lines,
+      [
+        "NAMA LENGKAP",
+        "FULL NAME"
+      ],
+      [
+        "KEWARGANEGARAAN",
+        "NATIONALITY"
+      ]
+    );
+
+  // -------------------------
+  // NATIONALITY
+  // -------------------------
 
   const nationality =
-    extractAfterLabel(
-      text,
+    getPassportField(
+      lines,
       [
-        "Nationality",
-        "Kewarganegaraan"
+        "KEWARGANEGARAAN",
+        "NATIONALITY"
       ],
       [
-        "Date of Birth",
-        "Date Of Birth",
-        "Tanggal Lahir",
-        "Sex"
+        "TGL. LAHIR",
+        "TGL LAHIR",
+        "DATE OF BIRTH"
       ]
     );
 
-  const dateOfBirth =
-    extractAfterLabel(
-      text,
+  // -------------------------
+  // DATE OF BIRTH
+  // -------------------------
+
+  const tanggalLahir =
+    getPassportDate(
+      lines,
       [
-        "Date of Birth",
-        "Date Of Birth",
-        "DOB",
-        "Tanggal Lahir"
-      ],
-      [
-        "Sex",
-        "Place of Birth",
-        "Place Of Birth"
+        "TGL. LAHIR",
+        "TGL LAHIR",
+        "DATE OF BIRTH"
       ]
     );
 
-  const placeOfBirth =
-    extractAfterLabel(
-      text,
+  // -------------------------
+  // SEX
+  // -------------------------
+
+  const jenisKelamin =
+    getPassportField(
+      lines,
       [
-        "Place of Birth",
-        "Place Of Birth",
-        "Tempat Lahir"
+        "KELAMIN",
+        "SEX"
       ],
       [
-        "Date of Birth",
-        "Date Of Birth",
-        "Sex"
+        "TEMPAT LAHIR",
+        "PLACE OF BIRTH"
       ]
     );
 
-  const gender =
-    extractAfterLabel(
-      text,
-      ["Sex"],
+  // -------------------------
+  // PLACE OF BIRTH
+  // -------------------------
+
+  const tempatLahir =
+    getPassportField(
+      lines,
       [
-        "Date of Birth",
-        "Place of Birth",
-        "Nationality"
+        "TEMPAT LAHIR",
+        "PLACE OF BIRTH"
+      ],
+      [
+        "TGL. PENGELUARAN",
+        "DATE OF ISSUE"
       ]
     );
 
-  const issued =
-    extractAfterLabel(
-      text,
+  // -------------------------
+  // DATE ISSUE
+  // -------------------------
+
+  const tanggalTerbit =
+    getPassportDate(
+      lines,
       [
-        "Authority",
-        "Issuing Authority",
-        "Place of Issue",
-        "Place Of Issue",
-        "Issued By",
-        "Kantor",
-        "Authority"
-      ],
-      [
-        "Date of Issue",
-        "Date Of Issue",
-        "Date of Expiry",
-        "Date Of Expiry"
+        "TGL. PENGELUARAN",
+        "TGL PENGELUARAN",
+        "DATE OF ISSUE"
       ]
     );
 
-  const dateIssued =
-    extractAfterLabel(
-      text,
-      [
-        "Date of Issue",
-        "Date Of Issue",
-        "Issued"
-      ],
-      [
-        "Date of Expiry",
-        "Date Of Expiry"
-      ]
-    );
+  // -------------------------
+  // EXPIRY
+  // -------------------------
 
   const expiry =
-    extractAfterLabel(
-      text,
+    getPassportDate(
+      lines,
       [
-        "Date of Expiry",
-        "Date Of Expiry",
-        "Expiry Date",
-        "Date of Expiration"
-      ],
-      [
-        "Authority",
-        "Issuing Authority"
+        "TGL. HABIS BERLAKU",
+        "TGL HABIS BERLAKU",
+        "DATE OF EXPIRY"
       ]
     );
 
-  const name =
-    extractPassportName(text);
+  // -------------------------
+  // ISSUING OFFICE
+  // -------------------------
+
+  const issuingAuthority =
+    getPassportField(
+      lines,
+      [
+        "KANTOR YANG MENGELUARKAN",
+        "ISSUING OFFICE",
+        "ISSUING AUTHORITY"
+      ],
+      [
+        "MRZ",
+        "NO. REG"
+      ]
+    );
+
+  // -------------------------
+  // MRZ
+  // -------------------------
 
   const mrz =
     extractMRZ(text);
 
   return {
-    document_type: "passport",
+    document_type:
+      "passport",
 
-    nomor_passport: passportNumber,
+    nomor_passport:
+      nomorPassport,
 
-    nama: name,
+    nama,
 
     nationality,
 
-    tanggal_lahir: normalizeDate(dateOfBirth),
+    tanggal_lahir:
+      tanggalLahir,
 
-    tempat_lahir: placeOfBirth,
+    tempat_lahir:
+      tempatLahir,
 
-    jenis_kelamin: gender,
+    jenis_kelamin:
+      jenisKelamin,
 
-    tanggal_terbit: normalizeDate(dateIssued),
+    tanggal_terbit:
+      tanggalTerbit,
 
-    expiry_date: normalizeDate(expiry),
+    expiry_date:
+      expiry,
 
-    issuing_authority: issued,
+    issuing_authority:
+      issuingAuthority,
 
     mrz
   };
@@ -1081,33 +1173,200 @@ function parsePassport(text) {
 
 
 // =========================================================
-// PASSPORT NUMBER
+// PASSPORT FIELD
 // =========================================================
 
-function extractPassportNumber(text) {
-  const matches =
-    text.match(
-      /\b[A-Z][A-Z0-9]{6,8}\b/gi
-    ) || [];
+function getPassportField(
+  lines,
+  labels,
+  stopLabels
+) {
+  const index =
+    lines.findIndex(line =>
+      labels.some(label =>
+        line.text
+          .toUpperCase()
+          .includes(
+            label.toUpperCase()
+          )
+      )
+    );
 
-  for (const value of matches) {
-    const upper = value.toUpperCase();
+  if (index < 0) {
+    return null;
+  }
 
-    // Hindari kata-kata umum
+  const line =
+    lines[index];
+
+  // Jangan mengambil label itu sendiri
+  let same =
+    valueAfterLabel(
+      line.text,
+      labels
+    );
+
+  if (same) {
+    const upper =
+      same.toUpperCase();
+
+    // Hindari hasil seperti:
+    // / PLACE OF
+    // PLACE OF
     if (
-      [
-        "PASSPORT",
-        "NATIONAL",
-        "AUTHORITY",
-        "REPUBLIC",
-        "INDONESIA"
-      ].includes(upper)
+      /^\/?\s*PLACE OF/i.test(
+        same
+      )
+    ) {
+      same = null;
+    }
+
+    if (
+      stopLabels.some(stop =>
+        upper.includes(
+          stop.toUpperCase()
+        )
+      )
+    ) {
+      same = null;
+    }
+  }
+
+  if (same) {
+    return clean(same);
+  }
+
+  // Cari baris setelah label
+  for (
+    let i = index + 1;
+    i <
+    Math.min(
+      lines.length,
+      index + 5
+    );
+    i++
+  ) {
+    const candidate =
+      lines[i].text.trim();
+
+    if (!candidate) continue;
+
+    const isStop =
+      stopLabels.some(stop =>
+        candidate
+          .toUpperCase()
+          .includes(
+            stop.toUpperCase()
+          )
+      );
+
+    if (isStop) {
+      continue;
+    }
+
+    // Jangan ambil label bilingual
+    if (
+      /^(PLACE OF|DATE OF|NO\.?|NATIONALITY|SEX|KELAMIN|TGL\.?)/i
+        .test(candidate)
     ) {
       continue;
     }
 
-    if (/^[A-Z]\d{7}$/.test(upper)) {
-      return upper;
+    return clean(candidate);
+  }
+
+  return null;
+}
+
+
+// =========================================================
+// PASSPORT DATE
+// =========================================================
+
+function getPassportDate(
+  lines,
+  labels
+) {
+  const index =
+    lines.findIndex(line =>
+      labels.some(label =>
+        line.text
+          .toUpperCase()
+          .includes(
+            label.toUpperCase()
+          )
+      )
+    );
+
+  if (index < 0) {
+    return null;
+  }
+
+  const current =
+    lines[index].text;
+
+  let value =
+    valueAfterLabel(
+      current,
+      labels
+    );
+
+  let date =
+    value?.match(
+      /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
+    );
+
+  if (date) {
+    return normalizeDate(
+      date[0]
+    );
+  }
+
+  // OCR passport sering memakai:
+  // 01 JAN 1990
+  const monthDate =
+    value?.match(
+      /\d{1,2}\s+[A-Z]{3,9}\s+\d{4}/i
+    );
+
+  if (monthDate) {
+    return clean(
+      monthDate[0]
+    );
+  }
+
+  for (
+    let i = index + 1;
+    i <
+    Math.min(
+      lines.length,
+      index + 4
+    );
+    i++
+  ) {
+    const t =
+      lines[i].text;
+
+    date =
+      t.match(
+        /\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/
+      );
+
+    if (date) {
+      return normalizeDate(
+        date[0]
+      );
+    }
+
+    const md =
+      t.match(
+        /\d{1,2}\s+[A-Z]{3,9}\s+\d{4}/i
+      );
+
+    if (md) {
+      return clean(
+        md[0]
+      );
     }
   }
 
@@ -1116,53 +1375,35 @@ function extractPassportNumber(text) {
 
 
 // =========================================================
-// PASSPORT NAME
-// =========================================================
-
-function extractPassportName(text) {
-  const value = extractAfterLabel(
-    text,
-    [
-      "Surname",
-      "Given Names",
-      "Full Name",
-      "Name"
-    ],
-    [
-      "Nationality",
-      "Date of Birth",
-      "Date Of Birth",
-      "Sex",
-      "Place of Birth"
-    ]
-  );
-
-  return value;
-}
-
-
-// =========================================================
 // MRZ
 // =========================================================
 
 function extractMRZ(text) {
-  const lines = text
-    .split("\n")
-    .map(line =>
-      line
-        .replace(/\s/g, "")
-        .toUpperCase()
-    )
-    .filter(Boolean);
+  const lines =
+    text
+      .split("\n")
+      .map(x =>
+        x
+          .replace(/\s/g, "")
+          .toUpperCase()
+      )
+      .filter(Boolean);
 
-  const candidates = lines.filter(line => {
-    if (line.length < 30) return false;
+  const candidates =
+    lines.filter(line => {
+      if (line.length < 25) {
+        return false;
+      }
 
-    const count =
-      (line.match(/</g) || []).length;
+      const chevrons =
+        (
+          line.match(
+            /</g
+          ) || []
+        ).length;
 
-    return count >= 3;
-  });
+      return chevrons >= 2;
+    });
 
   if (candidates.length >= 2) {
     return candidates
@@ -1175,18 +1416,228 @@ function extractMRZ(text) {
 
 
 // =========================================================
+// KK
+// =========================================================
+
+function parseKK(
+  text,
+  overlay
+) {
+  const lines =
+    getLines(overlay);
+
+  const noKK =
+    extract16(text);
+
+  const rows = [];
+
+  // =======================================================
+  // Cari header kolom
+  // =======================================================
+
+  let nikColumnX = null;
+  let namaColumnX = null;
+  let ayahColumnX = null;
+
+  for (const line of lines) {
+    const t =
+      line.text.toUpperCase();
+
+    if (
+      t.includes("NIK")
+    ) {
+      nikColumnX =
+        line.left;
+    }
+
+    if (
+      t === "NAMA" ||
+      t.startsWith("NAMA ")
+    ) {
+      namaColumnX =
+        line.left;
+    }
+
+    if (
+      t.includes("NAMA AYAH")
+    ) {
+      ayahColumnX =
+        line.left;
+    }
+  }
+
+  // =======================================================
+  // Cari setiap NIK
+  // =======================================================
+
+  for (
+    let i = 0;
+    i < lines.length;
+    i++
+  ) {
+    const line =
+      lines[i];
+
+    const match =
+      line.text.match(
+        /\b\d{16}\b/
+      );
+
+    if (!match) {
+      continue;
+    }
+
+    const nik =
+      match[0];
+
+    // -----------------------------------------------------
+    // Nama
+    // -----------------------------------------------------
+
+    let nama = null;
+
+    // Coba same line
+    const words =
+      line.words || [];
+
+    const nikWord =
+      words.find(w =>
+        String(
+          w.WordText || ""
+        ).replace(/\D/g, "")
+          .length >= 16
+      );
+
+    const nikX =
+      Number(
+        nikWord?.Left ??
+        line.left
+      );
+
+    const candidates =
+      lines.filter(l =>
+        Math.abs(
+          l.top - line.top
+        ) <=
+        Math.max(
+          25,
+          line.height * 2
+        )
+      );
+
+    // Nama berada di area kolom nama
+    if (namaColumnX != null) {
+      const c =
+        candidates.find(l =>
+          Math.abs(
+            l.left -
+            namaColumnX
+          ) < 120 &&
+          !/\b\d{16}\b/.test(
+            l.text
+          )
+        );
+
+      if (c) {
+        nama =
+          clean(c.text);
+      }
+    }
+
+    // Fallback: kata di kanan NIK
+    if (!nama) {
+      const c =
+        candidates.find(l =>
+          l.left > nikX + 40 &&
+          !/\b\d{16}\b/.test(
+            l.text
+          )
+        );
+
+      if (c) {
+        nama =
+          clean(c.text);
+      }
+    }
+
+    // -----------------------------------------------------
+    // Nama Ayah
+    //
+    // WAJIB berasal dari kolom Nama Ayah.
+    // BUKAN Kepala Keluarga.
+    // -----------------------------------------------------
+
+    let namaAyah = null;
+
+    if (ayahColumnX != null) {
+      const c =
+        candidates.find(l =>
+          Math.abs(
+            l.left -
+            ayahColumnX
+          ) < 160 &&
+          !/\b\d{16}\b/.test(
+            l.text
+          )
+        );
+
+      if (c) {
+        namaAyah =
+          clean(c.text);
+      }
+    }
+
+    rows.push({
+      nik,
+      nama,
+      nama_ayah:
+        namaAyah
+    });
+  }
+
+  // =======================================================
+  // DEDUPE
+  // =======================================================
+
+  const map =
+    new Map();
+
+  for (const row of rows) {
+    if (!map.has(row.nik)) {
+      map.set(
+        row.nik,
+        row
+      );
+    }
+  }
+
+  return {
+    document_type: "kk",
+
+    no_kk: noKK,
+
+    members:
+      Array.from(
+        map.values()
+      )
+  };
+}
+
+
+// =========================================================
 // GENERIC
 // =========================================================
 
 function parseGeneric(text) {
   return {
-    document_type: "unknown",
-    nik: extractNIK(text),
-    nama: extractAfterLabel(
-      text,
-      ["Nama", "Name"]
-    ),
-    raw_text_available: true
+    document_type:
+      "unknown",
+
+    nik:
+      extract16(text),
+
+    raw_text_available:
+      true
   };
 }
 
@@ -1195,58 +1646,70 @@ function parseGeneric(text) {
 // VALIDATION
 // =========================================================
 
-function validateData(type, data) {
-  const result = {
-    valid: true,
-    missing: [],
-    warnings: []
-  };
+function validate(
+  type,
+  data
+) {
+  const missing = [];
 
   if (type === "ktp") {
-    const required = [
-      ["nik", "NIK"],
-      ["nama", "Nama"],
-      ["tempat_lahir", "Tempat Lahir"],
-      ["tanggal_lahir", "Tanggal Lahir"],
-      ["jenis_kelamin", "Jenis Kelamin"]
-    ];
+    if (!data.nik)
+      missing.push("NIK");
 
-    for (const [key, label] of required) {
-      if (!data[key]) {
-        result.missing.push(label);
-      }
-    }
+    if (!data.nama)
+      missing.push("Nama");
+
+    if (!data.tempat_lahir)
+      missing.push(
+        "Tempat Lahir"
+      );
+
+    if (!data.tanggal_lahir)
+      missing.push(
+        "Tanggal Lahir"
+      );
+
+    if (!data.jenis_kelamin)
+      missing.push(
+        "Jenis Kelamin"
+      );
+  }
+
+  if (type === "passport") {
+    if (!data.nomor_passport)
+      missing.push(
+        "Nomor Passport"
+      );
+
+    if (!data.nama)
+      missing.push("Nama");
+
+    if (!data.tanggal_lahir)
+      missing.push(
+        "Tanggal Lahir"
+      );
   }
 
   if (type === "kk") {
-    if (!data.no_kk) {
-      result.missing.push("No. KK");
-    }
+    if (!data.no_kk)
+      missing.push(
+        "No. KK"
+      );
 
-    if (!data.members?.length) {
-      result.missing.push(
+    if (
+      !data.members ||
+      !data.members.length
+    ) {
+      missing.push(
         "Data anggota KK"
       );
     }
   }
 
-  if (type === "passport") {
-    const required = [
-      ["nomor_passport", "Nomor Passport"],
-      ["nama", "Nama"],
-      ["tanggal_lahir", "Tanggal Lahir"],
-      ["jenis_kelamin", "Jenis Kelamin"]
-    ];
+  return {
+    valid:
+      missing.length === 0,
 
-    for (const [key, label] of required) {
-      if (!data[key]) {
-        result.missing.push(label);
-      }
-    }
-  }
-
-  result.valid =
-    result.missing.length === 0;
-
-  return result;
+    missing
+  };
 }
