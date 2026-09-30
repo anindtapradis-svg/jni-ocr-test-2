@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -8,9 +10,10 @@
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>JNI OCR</title>
+  <title>JNI Travel OCR</title>
 
   <style>
+
     * {
       box-sizing: border-box;
     }
@@ -53,14 +56,17 @@
 
     h1 {
       margin-top: 0;
-
       color: #0b6f70;
     }
 
     h2 {
       margin-top: 0;
-
       color: #123;
+    }
+
+    h3 {
+      color: #123;
+      margin-top: 24px;
     }
 
     label {
@@ -73,6 +79,7 @@
 
     select,
     input[type="file"] {
+
       width: 100%;
 
       padding: 13px;
@@ -84,9 +91,11 @@
       background: white;
 
       font-size: 15px;
+
     }
 
     button {
+
       border: 0;
 
       border-radius: 12px;
@@ -100,27 +109,35 @@
       cursor: pointer;
 
       margin-right: 8px;
+
     }
 
     .primary {
+
       background: #24b1b1;
 
       color: white;
+
     }
 
     .secondary {
+
       background: #eaf5f5;
 
       color: #126d6e;
+
     }
 
     button:disabled {
+
       opacity: .5;
 
       cursor: not-allowed;
+
     }
 
     .status {
+
       margin-top: 18px;
 
       padding: 14px;
@@ -128,15 +145,19 @@
       border-radius: 12px;
 
       background: #eef8f4;
+
     }
 
     .error {
+
       background: #fff0f0;
 
       color: #a40000;
+
     }
 
     .usage {
+
       display: grid;
 
       grid-template-columns:
@@ -148,9 +169,11 @@
       gap: 14px;
 
       margin-top: 20px;
+
     }
 
     .usage-box {
+
       border: 1px solid #d9eeee;
 
       border-radius: 14px;
@@ -158,25 +181,31 @@
       padding: 18px;
 
       background: #fbffff;
+
     }
 
     .usage-title {
+
       font-size: 13px;
 
       color: #678;
 
       margin-bottom: 8px;
+
     }
 
     .usage-number {
+
       font-size: 24px;
 
       font-weight: 800;
 
       color: #0b6f70;
+
     }
 
     .grid {
+
       display: grid;
 
       grid-template-columns:
@@ -186,9 +215,11 @@
         );
 
       gap: 14px;
+
     }
 
     .field {
+
       border: 1px solid #dce9e9;
 
       border-radius: 12px;
@@ -196,50 +227,66 @@
       padding: 15px;
 
       background: #fff;
+
     }
 
     .field-label {
+
       font-size: 13px;
 
       color: #6c7d7d;
 
       margin-bottom: 6px;
+
     }
 
     .field-value {
+
       font-size: 16px;
 
       font-weight: 600;
 
       word-break: break-word;
+
+      white-space: pre-wrap;
+
     }
 
     .full {
+
       grid-column: 1 / -1;
+
     }
 
     table {
+
       width: 100%;
 
       border-collapse: collapse;
 
       margin-top: 14px;
+
     }
 
     th,
     td {
+
       border: 1px solid #dce9e9;
 
       padding: 10px;
 
       text-align: left;
+
     }
 
     th {
+
       background: #f0f8f8;
+
     }
 
     pre {
+
       white-space: pre-wrap;
 
       word-break: break-word;
@@ -255,49 +302,69 @@
       overflow-x: auto;
 
       font-size: 12px;
+
     }
 
     details {
+
       margin-top: 18px;
+
     }
 
     summary {
+
       cursor: pointer;
 
       font-weight: 700;
+
     }
 
     .small {
+
       font-size: 13px;
 
       color: #678;
 
       line-height: 1.5;
+
     }
 
     @media (
       max-width: 700px
     ) {
+
       .grid,
       .usage {
+
         grid-template-columns: 1fr;
+
       }
 
       .card {
+
         padding: 20px;
+
       }
 
       .container {
+
         width:
           calc(100% - 20px);
+
       }
+
     }
+
   </style>
+
 </head>
+
 
 <body>
 
+
 <div class="container">
+
 
   <!-- =====================================================
        HEADER
@@ -314,15 +381,15 @@
       secara otomatis.
     </p>
 
-    <!-- ===================================================
-         DOCUMENT TYPE
-    ==================================================== -->
 
     <label>
       Jenis Dokumen
     </label>
 
-    <select id="documentType">
+
+    <select
+      id="documentType"
+    >
 
       <option value="ktp">
         KTP
@@ -338,29 +405,31 @@
 
     </select>
 
+
     <br>
     <br>
 
-    <!-- ===================================================
-         FILE
-    ==================================================== -->
 
     <label>
       Upload Dokumen
     </label>
 
+
     <input
       id="fileInput"
       type="file"
-      accept=".jpg,.jpeg,.png,.pdf"
+      accept=".jpg,.jpeg,.png,.webp,.pdf"
     >
+
 
     <p
       id="fileInfo"
       class="small"
     ></p>
 
+
     <br>
+
 
     <button
       id="readButton"
@@ -369,12 +438,14 @@
       🔍 Baca Dokumen
     </button>
 
+
     <button
       id="resetButton"
       class="secondary"
     >
       Reset
     </button>
+
 
     <div
       id="status"
@@ -395,14 +466,23 @@
       Penggunaan OCR
     </h2>
 
+
     <p class="small">
-      Counter ini menghitung request yang
-      dikirim aplikasi dari browser ini.
-      Limit resmi OCR.space tetap dihitung
-      oleh OCR.space berdasarkan IP.
+
+      Counter ini adalah counter lokal
+      browser/perangkat ini.
+
+      <br>
+
+      Limit resmi OCR.space:
+      500 request/hari/IP dan
+      25.000 conversion/bulan.
+
     </p>
 
+
     <div class="usage">
+
 
       <div class="usage-box">
 
@@ -418,15 +498,16 @@
         </div>
 
         <div class="small">
-          dari batas 500
+          dari batas aman 490
         </div>
 
       </div>
 
+
       <div class="usage-box">
 
         <div class="usage-title">
-          Request bulan ini
+          Conversion bulan ini
         </div>
 
         <div
@@ -437,10 +518,11 @@
         </div>
 
         <div class="small">
-          dari batas 25.000
+          dari batas aman 24.900
         </div>
 
       </div>
+
 
     </div>
 
@@ -465,25 +547,28 @@
 
   </div>
 
+
 </div>
 
 
 <script>
 
+
   // =======================================================
-  // LIMIT OCR.SPACE
+  // LIMIT
   // =======================================================
 
-  const DAILY_LIMIT = 500;
+  const DAILY_LIMIT =
+    500;
 
-  const MONTHLY_LIMIT = 25000;
+  const MONTHLY_LIMIT =
+    25000;
 
-  // Sisakan sedikit buffer
-  // agar tidak mepet dengan limit resmi.
+  const DAILY_SAFE_LIMIT =
+    490;
 
-  const DAILY_SAFE_LIMIT = 490;
-
-  const MONTHLY_SAFE_LIMIT = 24900;
+  const MONTHLY_SAFE_LIMIT =
+    24900;
 
 
   // =======================================================
@@ -491,23 +576,78 @@
   // =======================================================
 
   const STORAGE_KEY =
-    "jni_ocr_usage_v1";
+    "jni_ocr_usage_v2";
 
+
+  // =======================================================
+  // JAKARTA DATE
+  // =======================================================
+
+  function getJakartaKeys() {
+
+    const parts =
+      new Intl.DateTimeFormat(
+        "en-CA",
+        {
+          timeZone:
+            "Asia/Jakarta",
+
+          year:
+            "numeric",
+
+          month:
+            "2-digit",
+
+          day:
+            "2-digit"
+        }
+      )
+        .formatToParts(
+          new Date()
+        );
+
+    const map = {};
+
+    for (
+      const p of parts
+    ) {
+
+      if (
+        p.type !==
+        "literal"
+      ) {
+
+        map[p.type] =
+          p.value;
+
+      }
+
+    }
+
+    const day =
+      `${map.year}-${map.month}-${map.day}`;
+
+    const month =
+      `${map.year}-${map.month}`;
+
+    return {
+      day,
+      month
+    };
+
+  }
+
+
+  // =======================================================
+  // GET USAGE
+  // =======================================================
 
   function getUsage() {
 
-    const now =
-      new Date();
+    const keys =
+      getJakartaKeys();
 
-    const day =
-      now.toISOString()
-        .slice(0, 10);
-
-    const month =
-      now.toISOString()
-        .slice(0, 7);
-
-    let data;
+    let data = {};
 
     try {
 
@@ -524,62 +664,71 @@
 
     }
 
+
     if (
-      data.day !== day
+      data.day !==
+      keys.day
     ) {
 
-      data.day = day;
+      data.day =
+        keys.day;
 
-      data.daily = 0;
+      data.daily =
+        0;
 
     }
 
+
     if (
-      data.month !== month
+      data.month !==
+      keys.month
     ) {
 
-      data.month = month;
+      data.month =
+        keys.month;
 
-      data.monthly = 0;
+      data.monthly =
+        0;
 
     }
+
 
     if (
       typeof data.daily !==
       "number"
     ) {
 
-      data.daily = 0;
+      data.daily =
+        0;
 
     }
+
 
     if (
       typeof data.monthly !==
       "number"
     ) {
 
-      data.monthly = 0;
+      data.monthly =
+        0;
 
     }
 
-    if (
-      typeof data.pages !==
-      "number"
-    ) {
-
-      data.pages = 0;
-
-    }
 
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify(data)
     );
 
+
     return data;
 
   }
 
+
+  // =======================================================
+  // SAVE
+  // =======================================================
 
   function saveUsage(
     data
@@ -595,34 +744,21 @@
   }
 
 
-  function incrementUsage(
-    pages = 1
-  ) {
-
-    const data =
-      getUsage();
-
-    data.daily += 1;
-
-    data.monthly += 1;
-
-    data.pages +=
-      Number(pages || 1);
-
-    saveUsage(data);
-
-  }
-
+  // =======================================================
+  // RENDER USAGE
+  // =======================================================
 
   function renderUsage() {
 
     const data =
       getUsage();
 
+
     document.getElementById(
       "dailyCount"
     ).textContent =
       data.daily;
+
 
     document.getElementById(
       "monthlyCount"
@@ -632,10 +768,17 @@
   }
 
 
-  function canUseOCR() {
+  // =======================================================
+  // CHECK LIMIT
+  // =======================================================
+
+  function canUseOCR(
+    estimatedConversions = 1
+  ) {
 
     const data =
       getUsage();
+
 
     if (
       data.daily >=
@@ -643,31 +786,36 @@
     ) {
 
       return {
+
         ok: false,
 
         message:
           "Batas aman OCR hari ini sudah tercapai (" +
           DAILY_SAFE_LIMIT +
           " request)."
+
       };
 
     }
 
+
     if (
-      data.monthly >=
+      data.monthly +
+      estimatedConversions >
       MONTHLY_SAFE_LIMIT
     ) {
 
       return {
+
         ok: false,
 
         message:
-          "Batas aman OCR bulan ini sudah tercapai (" +
-          MONTHLY_SAFE_LIMIT +
-          " request)."
+          "Batas aman conversion bulan ini hampir tercapai."
+
       };
 
     }
+
 
     return {
       ok: true
@@ -685,30 +833,36 @@
       "fileInput"
     );
 
+
   const documentType =
     document.getElementById(
       "documentType"
     );
+
 
   const readButton =
     document.getElementById(
       "readButton"
     );
 
+
   const resetButton =
     document.getElementById(
       "resetButton"
     );
+
 
   const status =
     document.getElementById(
       "status"
     );
 
+
   const resultCard =
     document.getElementById(
       "resultCard"
     );
+
 
   const result =
     document.getElementById(
@@ -727,6 +881,7 @@
       const file =
         fileInput.files[0];
 
+
       if (!file) {
 
         document.getElementById(
@@ -738,12 +893,14 @@
 
       }
 
+
       const mb =
         (
           file.size /
           1024 /
           1024
         ).toFixed(2);
+
 
       document.getElementById(
         "fileInfo"
@@ -755,7 +912,7 @@
 
 
   // =======================================================
-  // SHOW STATUS
+  // STATUS
   // =======================================================
 
   function showStatus(
@@ -778,7 +935,7 @@
 
 
   // =======================================================
-  // READ FILE
+  // FILE -> DATA URL
   // =======================================================
 
   function readAsDataURL(
@@ -794,14 +951,17 @@
         const reader =
           new FileReader();
 
+
         reader.onload =
           () =>
             resolve(
               reader.result
             );
 
+
         reader.onerror =
           reject;
+
 
         reader.readAsDataURL(
           file
@@ -814,7 +974,7 @@
 
 
   // =======================================================
-  // FORMAT VALUE
+  // DISPLAY VALUE
   // =======================================================
 
   function displayValue(
@@ -847,17 +1007,25 @@
   ) {
 
     return `
-      <div class="field ${full ? "full" : ""}">
+
+      <div
+        class="field ${full ? "full" : ""}"
+      >
+
         <div class="field-label">
           ${escapeHtml(label)}
         </div>
 
         <div class="field-value">
+
           ${escapeHtml(
             displayValue(value)
           )}
+
         </div>
+
       </div>
+
     `;
 
   }
@@ -872,6 +1040,7 @@
   ) {
 
     return `
+
       <div class="grid">
 
         ${field(
@@ -936,6 +1105,7 @@
         )}
 
       </div>
+
     `;
 
   }
@@ -950,6 +1120,7 @@
   ) {
 
     return `
+
       <div class="grid">
 
         ${field(
@@ -1004,6 +1175,7 @@
         )}
 
       </div>
+
     `;
 
   }
@@ -1017,7 +1189,9 @@
     data
   ) {
 
-    let rows = "";
+    let rows =
+      "";
+
 
     for (
       const member of
@@ -1025,6 +1199,7 @@
     ) {
 
       rows += `
+
         <tr>
 
           <td>
@@ -1052,9 +1227,11 @@
           </td>
 
         </tr>
+
       `;
 
     }
+
 
     return `
 
@@ -1063,32 +1240,49 @@
         data.no_kk
       )}
 
+
       <h3>
         Data Anggota
       </h3>
+
 
       <table>
 
         <thead>
 
           <tr>
-            <th>NIK</th>
-            <th>Nama</th>
-            <th>Nama Ayah</th>
+
+            <th>
+              NIK
+            </th>
+
+            <th>
+              Nama
+            </th>
+
+            <th>
+              Nama Ayah
+            </th>
+
           </tr>
 
         </thead>
+
 
         <tbody>
 
           ${
             rows ||
             `
+
               <tr>
+
                 <td colspan="3">
                   Tidak ada data anggota
                 </td>
+
               </tr>
+
             `
           }
 
@@ -1102,7 +1296,7 @@
 
 
   // =======================================================
-  // ESCAPE HTML
+  // ESCAPE
   // =======================================================
 
   function escapeHtml(
@@ -1110,22 +1304,27 @@
   ) {
 
     return String(value)
+
       .replace(
         /&/g,
         "&amp;"
       )
+
       .replace(
         /</g,
         "&lt;"
       )
+
       .replace(
         />/g,
         "&gt;"
       )
+
       .replace(
         /"/g,
         "&quot;"
       )
+
       .replace(
         /'/g,
         "&#039;"
@@ -1145,33 +1344,49 @@
     const type =
       payload.documentType;
 
+
     const data =
       payload.data || {};
 
-    let html = "";
+
+    let html =
+      "";
+
 
     if (
       type === "ktp"
     ) {
 
       html =
-        renderKTP(data);
+        renderKTP(
+          data
+        );
 
-    } else if (
+    }
+
+    else if (
       type === "passport"
     ) {
 
       html =
-        renderPassport(data);
+        renderPassport(
+          data
+        );
 
-    } else if (
+    }
+
+    else if (
       type === "kk"
     ) {
 
       html =
-        renderKK(data);
+        renderKK(
+          data
+        );
 
-    } else {
+    }
+
+    else {
 
       html =
         `<pre>${escapeHtml(
@@ -1184,6 +1399,7 @@
 
     }
 
+
     // =====================================================
     // VALIDATION
     // =====================================================
@@ -1191,8 +1407,10 @@
     const validation =
       payload.validation || {};
 
+
     let validationHtml =
       "";
+
 
     if (
       validation.missing &&
@@ -1200,6 +1418,7 @@
     ) {
 
       validationHtml = `
+
         <div class="status error">
 
           <strong>
@@ -1215,11 +1434,15 @@
           )}
 
         </div>
+
       `;
 
-    } else {
+    }
+
+    else {
 
       validationHtml = `
+
         <div class="status">
 
           <strong>
@@ -1227,9 +1450,40 @@
           </strong>
 
         </div>
+
       `;
 
     }
+
+
+    // Invalid
+    if (
+      validation.invalid &&
+      validation.invalid.length
+    ) {
+
+      validationHtml += `
+
+        <div class="status error">
+
+          <strong>
+            Perlu dicek:
+          </strong>
+
+          <br>
+
+          ${escapeHtml(
+            validation.invalid.join(
+              ", "
+            )
+          )}
+
+        </div>
+
+      `;
+
+    }
+
 
     result.innerHTML = `
 
@@ -1237,11 +1491,13 @@
 
       ${validationHtml}
 
+
       <details>
 
         <summary>
           JSON hasil OCR
         </summary>
+
 
         <pre>${escapeHtml(
           JSON.stringify(
@@ -1254,6 +1510,7 @@
       </details>
 
     `;
+
 
     resultCard.style.display =
       "block";
@@ -1272,6 +1529,7 @@
       const file =
         fileInput.files[0];
 
+
       if (!file) {
 
         showStatus(
@@ -1283,9 +1541,10 @@
 
       }
 
-      // ---------------------------------------------------
+
+      // ===================================================
       // SIZE
-      // ---------------------------------------------------
+      // ===================================================
 
       if (
         file.size >
@@ -1301,12 +1560,27 @@
 
       }
 
-      // ---------------------------------------------------
+
+      // ===================================================
       // LIMIT
-      // ---------------------------------------------------
+      // ===================================================
+
+      // Gambar = 1 conversion.
+      // PDF kita estimasikan maksimal 3 halaman
+      // untuk menjaga buffer Free OCR.space.
+
+      const estimatedConversions =
+        file.type ===
+        "application/pdf"
+          ? 3
+          : 1;
+
 
       const quota =
-        canUseOCR();
+        canUseOCR(
+          estimatedConversions
+        );
+
 
       if (!quota.ok) {
 
@@ -1319,51 +1593,50 @@
 
       }
 
+
       try {
 
         readButton.disabled =
           true;
 
+
         showStatus(
           "Sedang membaca dokumen..."
         );
 
-        // -------------------------------------------------
-        // FILE -> DATA URL
-        // -------------------------------------------------
+
+        // =================================================
+        // DATA URL
+        // =================================================
 
         const dataUrl =
           await readAsDataURL(
             file
           );
 
-        // -------------------------------------------------
-        // COUNT REQUEST
-        //
-        // Dihitung sebelum request dikirim
-        // karena request sudah benar-benar
-        // akan menggunakan OCR API.
-        // -------------------------------------------------
 
-        incrementUsage(1);
-
-        // -------------------------------------------------
+        // =================================================
         // API
-        // -------------------------------------------------
+        // =================================================
 
         const response =
           await fetch(
             "/api/ocr",
             {
-              method: "POST",
+
+              method:
+                "POST",
 
               headers: {
+
                 "Content-Type":
                   "application/json"
+
               },
 
               body:
                 JSON.stringify({
+
                   documentType:
                     documentType.value,
 
@@ -1374,21 +1647,30 @@
                     file.type,
 
                   dataUrl
+
                 })
+
             }
           );
+
 
         const raw =
           await response.text();
 
+
         let payload;
+
 
         try {
 
           payload =
-            JSON.parse(raw);
+            JSON.parse(
+              raw
+            );
 
-        } catch {
+        }
+
+        catch {
 
           throw new Error(
             "Server mengembalikan response bukan JSON.\n" +
@@ -1399,6 +1681,7 @@
           );
 
         }
+
 
         if (
           !response.ok ||
@@ -1412,46 +1695,53 @@
 
         }
 
-        // -------------------------------------------------
-        // UPDATE PAGE COUNTER
-        // -------------------------------------------------
 
-        if (
-          payload.ocr &&
-          payload.ocr.pages
-        ) {
+        // =================================================
+        // COUNT ACTUAL SUCCESSFUL OCR
+        // =================================================
 
-          const usage =
-            getUsage();
+        const usage =
+          getUsage();
 
-          usage.pages +=
-            Number(
-              payload.ocr.pages
-            );
 
-          saveUsage(
-            usage
+        usage.daily +=
+          1;
+
+
+        usage.monthly +=
+          Number(
+            payload?.ocr?.pages ||
+            1
           );
 
-        }
 
-        // -------------------------------------------------
+        saveUsage(
+          usage
+        );
+
+
+        // =================================================
         // SHOW
-        // -------------------------------------------------
+        // =================================================
 
         showStatus(
           "Dokumen berhasil dibaca."
         );
 
+
         renderResult(
           payload
         );
 
-      } catch (error) {
+
+      }
+
+      catch (error) {
 
         console.error(
           error
         );
+
 
         showStatus(
           error.message ||
@@ -1459,7 +1749,9 @@
           true
         );
 
-      } finally {
+      }
+
+      finally {
 
         readButton.disabled =
           false;
@@ -1505,7 +1797,10 @@
 
   renderUsage();
 
+
 </script>
 
+
 </body>
+
 </html>
