@@ -1,28 +1,1511 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JNI OCR Test</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#f4fafa;font-family:Arial,sans-serif;color:#153333}.container{max-width:900px;margin:auto;padding:30px 16px}.header{display:flex;align-items:center;gap:12px}.logo{width:45px;height:45px;background:#24B1B1;color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:bold}h1{margin:0;font-size:25px}.muted{color:#718181}.card{background:#fff;padding:20px;margin-top:18px;border-radius:18px;border:1px solid #dceaea}label{display:block;font-weight:bold;margin-bottom:7px}select,input[type=file]{width:100%;padding:12px;border:1px solid #ccd;border-radius:10px;background:#fff}.dropzone{margin-top:15px;padding:30px;border:2px dashed #9fcaca;border-radius:14px;text-align:center;cursor:pointer}button{margin-top:15px;padding:12px 18px;border:0;border-radius:10px;background:#24B1B1;color:#fff;font-weight:bold;cursor:pointer}button.secondary{background:#edf7f7;color:#146565;margin-left:8px}button:disabled{opacity:.6;cursor:not-allowed}.status{margin-top:15px;padding:12px;background:#f1f6f6;border-radius:10px;white-space:pre-wrap}.error{background:#fff0f0;color:#9b2424}.success{background:#edf9f2;color:#17663b}.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:15px}.field{padding:12px;border:1px solid #e0eaea;border-radius:10px}.field small{display:block;color:#718181;margin-bottom:5px}.field input{width:100%;border:0;outline:0;font-size:15px;padding:0}pre{background:#102020;color:#dffafa;padding:15px;border-radius:10px;overflow:auto;font-size:12px}.hidden{display:none}@media(max-width:650px){.result-grid{grid-template-columns:1fr}}
-</style></head>
-<body><div class="container">
-<div class="header"><div class="logo">JNI</div><div><h1>JNI OCR Test</h1><div class="muted">Pembaca KTP / Paspor / KK</div></div></div>
-<div class="card">
-<label>Jenis Dokumen</label><select id="documentType"><option value="KTP">KTP</option><option value="PASSPORT">Paspor</option><option value="KK">KK</option><option value="OTHER">Dokumen lain</option></select>
-<label style="margin-top:15px">Upload Dokumen</label><input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf">
-<div class="dropzone" id="dropzone"><strong>Tarik file ke sini</strong><br><span class="muted">atau klik untuk memilih file</span></div>
-<button id="readButton">🔍 Baca Dokumen</button><button class="secondary" id="resetButton">Reset</button><div id="status" class="status hidden"></div>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>JNI OCR</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+      background: #f4fbfb;
+      color: #123;
+    }
+
+    .container {
+      width: min(
+        1200px,
+        calc(100% - 32px)
+      );
+
+      margin: 30px auto;
+    }
+
+    .card {
+      background: white;
+
+      border: 1px solid #d9eeee;
+
+      border-radius: 20px;
+
+      padding: 28px;
+
+      margin-bottom: 22px;
+
+      box-shadow:
+        0 8px 30px
+        rgba(0, 0, 0, 0.04);
+    }
+
+    h1 {
+      margin-top: 0;
+
+      color: #0b6f70;
+    }
+
+    h2 {
+      margin-top: 0;
+
+      color: #123;
+    }
+
+    label {
+      display: block;
+
+      font-weight: 700;
+
+      margin-bottom: 8px;
+    }
+
+    select,
+    input[type="file"] {
+      width: 100%;
+
+      padding: 13px;
+
+      border: 1px solid #cfe3e3;
+
+      border-radius: 10px;
+
+      background: white;
+
+      font-size: 15px;
+    }
+
+    button {
+      border: 0;
+
+      border-radius: 12px;
+
+      padding: 13px 22px;
+
+      font-size: 16px;
+
+      font-weight: 700;
+
+      cursor: pointer;
+
+      margin-right: 8px;
+    }
+
+    .primary {
+      background: #24b1b1;
+
+      color: white;
+    }
+
+    .secondary {
+      background: #eaf5f5;
+
+      color: #126d6e;
+    }
+
+    button:disabled {
+      opacity: .5;
+
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 18px;
+
+      padding: 14px;
+
+      border-radius: 12px;
+
+      background: #eef8f4;
+    }
+
+    .error {
+      background: #fff0f0;
+
+      color: #a40000;
+    }
+
+    .usage {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
+
+      gap: 14px;
+
+      margin-top: 20px;
+    }
+
+    .usage-box {
+      border: 1px solid #d9eeee;
+
+      border-radius: 14px;
+
+      padding: 18px;
+
+      background: #fbffff;
+    }
+
+    .usage-title {
+      font-size: 13px;
+
+      color: #678;
+
+      margin-bottom: 8px;
+    }
+
+    .usage-number {
+      font-size: 24px;
+
+      font-weight: 800;
+
+      color: #0b6f70;
+    }
+
+    .grid {
+      display: grid;
+
+      grid-template-columns:
+        repeat(
+          2,
+          minmax(0, 1fr)
+        );
+
+      gap: 14px;
+    }
+
+    .field {
+      border: 1px solid #dce9e9;
+
+      border-radius: 12px;
+
+      padding: 15px;
+
+      background: #fff;
+    }
+
+    .field-label {
+      font-size: 13px;
+
+      color: #6c7d7d;
+
+      margin-bottom: 6px;
+    }
+
+    .field-value {
+      font-size: 16px;
+
+      font-weight: 600;
+
+      word-break: break-word;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    table {
+      width: 100%;
+
+      border-collapse: collapse;
+
+      margin-top: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid #dce9e9;
+
+      padding: 10px;
+
+      text-align: left;
+    }
+
+    th {
+      background: #f0f8f8;
+    }
+
+    pre {
+      white-space: pre-wrap;
+
+      word-break: break-word;
+
+      background: #111;
+
+      color: #e7f7f7;
+
+      padding: 16px;
+
+      border-radius: 12px;
+
+      overflow-x: auto;
+
+      font-size: 12px;
+    }
+
+    details {
+      margin-top: 18px;
+    }
+
+    summary {
+      cursor: pointer;
+
+      font-weight: 700;
+    }
+
+    .small {
+      font-size: 13px;
+
+      color: #678;
+
+      line-height: 1.5;
+    }
+
+    @media (
+      max-width: 700px
+    ) {
+      .grid,
+      .usage {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .container {
+        width:
+          calc(100% - 20px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- =====================================================
+       HEADER
+  ====================================================== -->
+
+  <div class="card">
+
+    <h1>
+      JNI Travel OCR
+    </h1>
+
+    <p class="small">
+      Baca KTP, KK, dan Passport
+      secara otomatis.
+    </p>
+
+    <!-- ===================================================
+         DOCUMENT TYPE
+    ==================================================== -->
+
+    <label>
+      Jenis Dokumen
+    </label>
+
+    <select id="documentType">
+
+      <option value="ktp">
+        KTP
+      </option>
+
+      <option value="kk">
+        KK
+      </option>
+
+      <option value="passport">
+        Passport
+      </option>
+
+    </select>
+
+    <br>
+    <br>
+
+    <!-- ===================================================
+         FILE
+    ==================================================== -->
+
+    <label>
+      Upload Dokumen
+    </label>
+
+    <input
+      id="fileInput"
+      type="file"
+      accept=".jpg,.jpeg,.png,.pdf"
+    >
+
+    <p
+      id="fileInfo"
+      class="small"
+    ></p>
+
+    <br>
+
+    <button
+      id="readButton"
+      class="primary"
+    >
+      🔍 Baca Dokumen
+    </button>
+
+    <button
+      id="resetButton"
+      class="secondary"
+    >
+      Reset
+    </button>
+
+    <div
+      id="status"
+      class="status"
+      style="display:none"
+    ></div>
+
+  </div>
+
+
+  <!-- =====================================================
+       LIMIT
+  ====================================================== -->
+
+  <div class="card">
+
+    <h2>
+      Penggunaan OCR
+    </h2>
+
+    <p class="small">
+      Counter ini menghitung request yang
+      dikirim aplikasi dari browser ini.
+      Limit resmi OCR.space tetap dihitung
+      oleh OCR.space berdasarkan IP.
+    </p>
+
+    <div class="usage">
+
+      <div class="usage-box">
+
+        <div class="usage-title">
+          Request hari ini
+        </div>
+
+        <div
+          id="dailyCount"
+          class="usage-number"
+        >
+          0
+        </div>
+
+        <div class="small">
+          dari batas 500
+        </div>
+
+      </div>
+
+      <div class="usage-box">
+
+        <div class="usage-title">
+          Request bulan ini
+        </div>
+
+        <div
+          id="monthlyCount"
+          class="usage-number"
+        >
+          0
+        </div>
+
+        <div class="small">
+          dari batas 25.000
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =====================================================
+       RESULT
+  ====================================================== -->
+
+  <div
+    id="resultCard"
+    class="card"
+    style="display:none"
+  >
+
+    <h2>
+      Hasil Pembacaan
+    </h2>
+
+    <div id="result"></div>
+
+  </div>
+
 </div>
-<div class="card hidden" id="resultCard"><h2>Hasil Pembacaan</h2><div id="resultGrid" class="result-grid"></div><h3>Validasi</h3><div id="validation" class="status"></div><details style="margin-top:15px"><summary>JSON hasil OCR</summary><pre id="jsonResult"></pre></details></div>
-</div>
+
+
 <script>
-const fileInput=document.getElementById('fileInput'),dropzone=document.getElementById('dropzone'),readButton=document.getElementById('readButton'),resetButton=document.getElementById('resetButton'),statusBox=document.getElementById('status');let selectedFile=null;
-fileInput.addEventListener('change',()=>{selectedFile=fileInput.files[0]||null;showFile()});dropzone.addEventListener('click',()=>fileInput.click());dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.style.borderColor='#24B1B1'});dropzone.addEventListener('drop',e=>{e.preventDefault();selectedFile=e.dataTransfer.files[0]||null;showFile()});
-function showFile(){dropzone.innerHTML=selectedFile?`<strong>${escapeHtml(selectedFile.name)}</strong><br><span class="muted">${(selectedFile.size/1024/1024).toFixed(2)} MB</span>`:'<strong>Tarik file ke sini</strong><br><span class="muted">atau klik untuk memilih file</span>'}
-function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function status(msg,type=''){statusBox.className='status '+type;statusBox.textContent=msg;statusBox.classList.remove('hidden')}
-function fileToDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)})}
-readButton.addEventListener('click',async()=>{if(!selectedFile)return status('Pilih dokumen terlebih dahulu.','error');if(selectedFile.size>5*1024*1024)return status('Ukuran file maksimal 5 MB.','error');readButton.disabled=true;readButton.textContent='⏳ Membaca dokumen...';try{status('Mengirim dokumen ke OCR...');const dataUrl=await fileToDataURL(selectedFile);const response=await fetch('/api/ocr',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({documentType:document.getElementById('documentType').value,fileName:selectedFile.name,mimeType:selectedFile.type,dataUrl})});const responseText=await response.text();let result;try{result=JSON.parse(responseText)}catch{throw new Error(`Server mengembalikan response bukan JSON.\nHTTP ${response.status}\n\n${responseText.substring(0,800)}`)}if(!response.ok)throw new Error(result.error||'OCR gagal.');displayResult(result);status('Dokumen berhasil dibaca.','success')}catch(e){status(e.message||'Terjadi kesalahan.','error')}finally{readButton.disabled=false;readButton.textContent='🔍 Baca Dokumen'}});
-function displayResult(result){const d=result.data||{};const fields=[['Nama','nama'],['NIK','nik'],['No. Paspor','passport_number'],['Tempat Lahir','tempat_lahir'],['Tanggal Lahir','tanggal_lahir'],['Jenis Kelamin','jenis_kelamin'],['Kewarganegaraan','nationality'],['Tanggal Terbit','tanggal_terbit'],['Tanggal Expired','expiry_date'],['Alamat','alamat'],['Nomor KK','kk_number'],['MRZ','mrz']];document.getElementById('resultGrid').innerHTML=fields.filter(f=>d[f[1]]).map(f=>`<div class="field"><small>${f[0]}</small><input readonly value="${escapeHtml(d[f[1]])}"></div>`).join('');const checks=result.validation?.checks||[];document.getElementById('validation').textContent=checks.map(x=>`${x.ok?'✓':'⚠'} ${x.message}`).join('\n')||'Tidak ada hasil validasi.';document.getElementById('jsonResult').textContent=JSON.stringify(result,null,2);document.getElementById('resultCard').classList.remove('hidden')}
-resetButton.addEventListener('click',()=>{selectedFile=null;fileInput.value='';document.getElementById('resultCard').classList.add('hidden');statusBox.classList.add('hidden');showFile()});
-</script></body></html>
+
+  // =======================================================
+  // LIMIT OCR.SPACE
+  // =======================================================
+
+  const DAILY_LIMIT = 500;
+
+  const MONTHLY_LIMIT = 25000;
+
+  // Sisakan sedikit buffer
+  // agar tidak mepet dengan limit resmi.
+
+  const DAILY_SAFE_LIMIT = 490;
+
+  const MONTHLY_SAFE_LIMIT = 24900;
+
+
+  // =======================================================
+  // STORAGE
+  // =======================================================
+
+  const STORAGE_KEY =
+    "jni_ocr_usage_v1";
+
+
+  function getUsage() {
+
+    const now =
+      new Date();
+
+    const day =
+      now.toISOString()
+        .slice(0, 10);
+
+    const month =
+      now.toISOString()
+        .slice(0, 7);
+
+    let data;
+
+    try {
+
+      data =
+        JSON.parse(
+          localStorage.getItem(
+            STORAGE_KEY
+          ) || "{}"
+        );
+
+    } catch {
+
+      data = {};
+
+    }
+
+    if (
+      data.day !== day
+    ) {
+
+      data.day = day;
+
+      data.daily = 0;
+
+    }
+
+    if (
+      data.month !== month
+    ) {
+
+      data.month = month;
+
+      data.monthly = 0;
+
+    }
+
+    if (
+      typeof data.daily !==
+      "number"
+    ) {
+
+      data.daily = 0;
+
+    }
+
+    if (
+      typeof data.monthly !==
+      "number"
+    ) {
+
+      data.monthly = 0;
+
+    }
+
+    if (
+      typeof data.pages !==
+      "number"
+    ) {
+
+      data.pages = 0;
+
+    }
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(data)
+    );
+
+    return data;
+
+  }
+
+
+  function saveUsage(
+    data
+  ) {
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(data)
+    );
+
+    renderUsage();
+
+  }
+
+
+  function incrementUsage(
+    pages = 1
+  ) {
+
+    const data =
+      getUsage();
+
+    data.daily += 1;
+
+    data.monthly += 1;
+
+    data.pages +=
+      Number(pages || 1);
+
+    saveUsage(data);
+
+  }
+
+
+  function renderUsage() {
+
+    const data =
+      getUsage();
+
+    document.getElementById(
+      "dailyCount"
+    ).textContent =
+      data.daily;
+
+    document.getElementById(
+      "monthlyCount"
+    ).textContent =
+      data.monthly;
+
+  }
+
+
+  function canUseOCR() {
+
+    const data =
+      getUsage();
+
+    if (
+      data.daily >=
+      DAILY_SAFE_LIMIT
+    ) {
+
+      return {
+        ok: false,
+
+        message:
+          "Batas aman OCR hari ini sudah tercapai (" +
+          DAILY_SAFE_LIMIT +
+          " request)."
+      };
+
+    }
+
+    if (
+      data.monthly >=
+      MONTHLY_SAFE_LIMIT
+    ) {
+
+      return {
+        ok: false,
+
+        message:
+          "Batas aman OCR bulan ini sudah tercapai (" +
+          MONTHLY_SAFE_LIMIT +
+          " request)."
+      };
+
+    }
+
+    return {
+      ok: true
+    };
+
+  }
+
+
+  // =======================================================
+  // ELEMENT
+  // =======================================================
+
+  const fileInput =
+    document.getElementById(
+      "fileInput"
+    );
+
+  const documentType =
+    document.getElementById(
+      "documentType"
+    );
+
+  const readButton =
+    document.getElementById(
+      "readButton"
+    );
+
+  const resetButton =
+    document.getElementById(
+      "resetButton"
+    );
+
+  const status =
+    document.getElementById(
+      "status"
+    );
+
+  const resultCard =
+    document.getElementById(
+      "resultCard"
+    );
+
+  const result =
+    document.getElementById(
+      "result"
+    );
+
+
+  // =======================================================
+  // FILE INFO
+  // =======================================================
+
+  fileInput.addEventListener(
+    "change",
+    () => {
+
+      const file =
+        fileInput.files[0];
+
+      if (!file) {
+
+        document.getElementById(
+          "fileInfo"
+        ).textContent =
+          "";
+
+        return;
+
+      }
+
+      const mb =
+        (
+          file.size /
+          1024 /
+          1024
+        ).toFixed(2);
+
+      document.getElementById(
+        "fileInfo"
+      ).textContent =
+        `${file.name} — ${mb} MB`;
+
+    }
+  );
+
+
+  // =======================================================
+  // SHOW STATUS
+  // =======================================================
+
+  function showStatus(
+    message,
+    isError = false
+  ) {
+
+    status.style.display =
+      "block";
+
+    status.textContent =
+      message;
+
+    status.className =
+      isError
+        ? "status error"
+        : "status";
+
+  }
+
+
+  // =======================================================
+  // READ FILE
+  // =======================================================
+
+  function readAsDataURL(
+    file
+  ) {
+
+    return new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+
+        const reader =
+          new FileReader();
+
+        reader.onload =
+          () =>
+            resolve(
+              reader.result
+            );
+
+        reader.onerror =
+          reject;
+
+        reader.readAsDataURL(
+          file
+        );
+
+      }
+    );
+
+  }
+
+
+  // =======================================================
+  // FORMAT VALUE
+  // =======================================================
+
+  function displayValue(
+    value
+  ) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+
+      return "-";
+
+    }
+
+    return String(value);
+
+  }
+
+
+  // =======================================================
+  // FIELD
+  // =======================================================
+
+  function field(
+    label,
+    value,
+    full = false
+  ) {
+
+    return `
+      <div class="field ${full ? "full" : ""}">
+        <div class="field-label">
+          ${escapeHtml(label)}
+        </div>
+
+        <div class="field-value">
+          ${escapeHtml(
+            displayValue(value)
+          )}
+        </div>
+      </div>
+    `;
+
+  }
+
+
+  // =======================================================
+  // RENDER KTP
+  // =======================================================
+
+  function renderKTP(
+    data
+  ) {
+
+    return `
+      <div class="grid">
+
+        ${field(
+          "Nama",
+          data.nama
+        )}
+
+        ${field(
+          "NIK",
+          data.nik
+        )}
+
+        ${field(
+          "Tempat Lahir",
+          data.tempat_lahir
+        )}
+
+        ${field(
+          "Tanggal Lahir",
+          data.tanggal_lahir
+        )}
+
+        ${field(
+          "Jenis Kelamin",
+          data.jenis_kelamin
+        )}
+
+        ${field(
+          "Status Perkawinan",
+          data.status_perkawinan
+        )}
+
+        ${field(
+          "Pekerjaan",
+          data.pekerjaan
+        )}
+
+        ${field(
+          "Kewarganegaraan",
+          data.kewarganegaraan
+        )}
+
+        ${field(
+          "Alamat",
+          data.alamat,
+          true
+        )}
+
+        ${field(
+          "RT/RW",
+          data.rt_rw
+        )}
+
+        ${field(
+          "Kelurahan/Desa",
+          data.kelurahan_desa
+        )}
+
+        ${field(
+          "Kecamatan",
+          data.kecamatan
+        )}
+
+      </div>
+    `;
+
+  }
+
+
+  // =======================================================
+  // RENDER PASSPORT
+  // =======================================================
+
+  function renderPassport(
+    data
+  ) {
+
+    return `
+      <div class="grid">
+
+        ${field(
+          "Nama",
+          data.nama
+        )}
+
+        ${field(
+          "Nomor Passport",
+          data.nomor_passport
+        )}
+
+        ${field(
+          "Nationality",
+          data.nationality
+        )}
+
+        ${field(
+          "Tanggal Lahir",
+          data.tanggal_lahir
+        )}
+
+        ${field(
+          "Tempat Lahir",
+          data.tempat_lahir
+        )}
+
+        ${field(
+          "Jenis Kelamin",
+          data.jenis_kelamin
+        )}
+
+        ${field(
+          "Tanggal Terbit",
+          data.tanggal_terbit
+        )}
+
+        ${field(
+          "Tanggal Expired",
+          data.expiry_date
+        )}
+
+        ${field(
+          "Issuing Office",
+          data.issuing_authority
+        )}
+
+        ${field(
+          "MRZ",
+          data.mrz,
+          true
+        )}
+
+      </div>
+    `;
+
+  }
+
+
+  // =======================================================
+  // RENDER KK
+  // =======================================================
+
+  function renderKK(
+    data
+  ) {
+
+    let rows = "";
+
+    for (
+      const member of
+      data.members || []
+    ) {
+
+      rows += `
+        <tr>
+
+          <td>
+            ${escapeHtml(
+              displayValue(
+                member.nik
+              )
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              displayValue(
+                member.nama
+              )
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              displayValue(
+                member.nama_ayah
+              )
+            )}
+          </td>
+
+        </tr>
+      `;
+
+    }
+
+    return `
+
+      ${field(
+        "No. KK",
+        data.no_kk
+      )}
+
+      <h3>
+        Data Anggota
+      </h3>
+
+      <table>
+
+        <thead>
+
+          <tr>
+            <th>NIK</th>
+            <th>Nama</th>
+            <th>Nama Ayah</th>
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          ${
+            rows ||
+            `
+              <tr>
+                <td colspan="3">
+                  Tidak ada data anggota
+                </td>
+              </tr>
+            `
+          }
+
+        </tbody>
+
+      </table>
+
+    `;
+
+  }
+
+
+  // =======================================================
+  // ESCAPE HTML
+  // =======================================================
+
+  function escapeHtml(
+    value
+  ) {
+
+    return String(value)
+      .replace(
+        /&/g,
+        "&amp;"
+      )
+      .replace(
+        /</g,
+        "&lt;"
+      )
+      .replace(
+        />/g,
+        "&gt;"
+      )
+      .replace(
+        /"/g,
+        "&quot;"
+      )
+      .replace(
+        /'/g,
+        "&#039;"
+      );
+
+  }
+
+
+  // =======================================================
+  // RENDER RESULT
+  // =======================================================
+
+  function renderResult(
+    payload
+  ) {
+
+    const type =
+      payload.documentType;
+
+    const data =
+      payload.data || {};
+
+    let html = "";
+
+    if (
+      type === "ktp"
+    ) {
+
+      html =
+        renderKTP(data);
+
+    } else if (
+      type === "passport"
+    ) {
+
+      html =
+        renderPassport(data);
+
+    } else if (
+      type === "kk"
+    ) {
+
+      html =
+        renderKK(data);
+
+    } else {
+
+      html =
+        `<pre>${escapeHtml(
+          JSON.stringify(
+            data,
+            null,
+            2
+          )
+        )}</pre>`;
+
+    }
+
+    // =====================================================
+    // VALIDATION
+    // =====================================================
+
+    const validation =
+      payload.validation || {};
+
+    let validationHtml =
+      "";
+
+    if (
+      validation.missing &&
+      validation.missing.length
+    ) {
+
+      validationHtml = `
+        <div class="status error">
+
+          <strong>
+            Data belum terbaca:
+          </strong>
+
+          <br>
+
+          ${escapeHtml(
+            validation.missing.join(
+              ", "
+            )
+          )}
+
+        </div>
+      `;
+
+    } else {
+
+      validationHtml = `
+        <div class="status">
+
+          <strong>
+            ✓ Validasi dasar lengkap
+          </strong>
+
+        </div>
+      `;
+
+    }
+
+    result.innerHTML = `
+
+      ${html}
+
+      ${validationHtml}
+
+      <details>
+
+        <summary>
+          JSON hasil OCR
+        </summary>
+
+        <pre>${escapeHtml(
+          JSON.stringify(
+            payload,
+            null,
+            2
+          )
+        )}</pre>
+
+      </details>
+
+    `;
+
+    resultCard.style.display =
+      "block";
+
+  }
+
+
+  // =======================================================
+  // READ BUTTON
+  // =======================================================
+
+  readButton.addEventListener(
+    "click",
+    async () => {
+
+      const file =
+        fileInput.files[0];
+
+      if (!file) {
+
+        showStatus(
+          "Pilih file terlebih dahulu.",
+          true
+        );
+
+        return;
+
+      }
+
+      // ---------------------------------------------------
+      // SIZE
+      // ---------------------------------------------------
+
+      if (
+        file.size >
+        1024 * 1024
+      ) {
+
+        showStatus(
+          "File lebih dari 1 MB. Kompres dulu.",
+          true
+        );
+
+        return;
+
+      }
+
+      // ---------------------------------------------------
+      // LIMIT
+      // ---------------------------------------------------
+
+      const quota =
+        canUseOCR();
+
+      if (!quota.ok) {
+
+        showStatus(
+          quota.message,
+          true
+        );
+
+        return;
+
+      }
+
+      try {
+
+        readButton.disabled =
+          true;
+
+        showStatus(
+          "Sedang membaca dokumen..."
+        );
+
+        // -------------------------------------------------
+        // FILE -> DATA URL
+        // -------------------------------------------------
+
+        const dataUrl =
+          await readAsDataURL(
+            file
+          );
+
+        // -------------------------------------------------
+        // COUNT REQUEST
+        //
+        // Dihitung sebelum request dikirim
+        // karena request sudah benar-benar
+        // akan menggunakan OCR API.
+        // -------------------------------------------------
+
+        incrementUsage(1);
+
+        // -------------------------------------------------
+        // API
+        // -------------------------------------------------
+
+        const response =
+          await fetch(
+            "/api/ocr",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+                  documentType:
+                    documentType.value,
+
+                  fileName:
+                    file.name,
+
+                  mimeType:
+                    file.type,
+
+                  dataUrl
+                })
+            }
+          );
+
+        const raw =
+          await response.text();
+
+        let payload;
+
+        try {
+
+          payload =
+            JSON.parse(raw);
+
+        } catch {
+
+          throw new Error(
+            "Server mengembalikan response bukan JSON.\n" +
+            raw.substring(
+              0,
+              1000
+            )
+          );
+
+        }
+
+        if (
+          !response.ok ||
+          !payload.ok
+        ) {
+
+          throw new Error(
+            payload.error ||
+            "OCR gagal."
+          );
+
+        }
+
+        // -------------------------------------------------
+        // UPDATE PAGE COUNTER
+        // -------------------------------------------------
+
+        if (
+          payload.ocr &&
+          payload.ocr.pages
+        ) {
+
+          const usage =
+            getUsage();
+
+          usage.pages +=
+            Number(
+              payload.ocr.pages
+            );
+
+          saveUsage(
+            usage
+          );
+
+        }
+
+        // -------------------------------------------------
+        // SHOW
+        // -------------------------------------------------
+
+        showStatus(
+          "Dokumen berhasil dibaca."
+        );
+
+        renderResult(
+          payload
+        );
+
+      } catch (error) {
+
+        console.error(
+          error
+        );
+
+        showStatus(
+          error.message ||
+          "Terjadi error.",
+          true
+        );
+
+      } finally {
+
+        readButton.disabled =
+          false;
+
+      }
+
+    }
+  );
+
+
+  // =======================================================
+  // RESET
+  // =======================================================
+
+  resetButton.addEventListener(
+    "click",
+    () => {
+
+      fileInput.value =
+        "";
+
+      result.innerHTML =
+        "";
+
+      resultCard.style.display =
+        "none";
+
+      status.style.display =
+        "none";
+
+      document.getElementById(
+        "fileInfo"
+      ).textContent =
+        "";
+
+    }
+  );
+
+
+  // =======================================================
+  // INIT
+  // =======================================================
+
+  renderUsage();
+
+</script>
+
+</body>
+</html>
