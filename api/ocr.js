@@ -1,710 +1,335 @@
-const MAX_BYTES = 2500000;
-
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf"
-];
-
-function sendJSON(res, status, data) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
-  res.end(JSON.stringify(data));
-}
-
-function validNIK(nik) {
-  return typeof nik === "string" && /^\d{16}$/.test(nik);
-}
-
-function validPassport(number) {
-  if (!number) return false;
-
-  return /^[A-Z0-9]{7,12}$/.test(
-    String(number)
-      .toUpperCase()
-      .replace(/\s/g, "")
-  );
-}
-
-function checkMRZDigit(value) {
-  const weights = [7, 3, 1];
-
-  let sum = 0;
-
-  for (let i = 0; i < value.length; i++) {
-    const char = value[i];
-
-    let number;
-
-    if (char >= "0" && char <= "9") {
-      number = Number(char);
-    } else if (char >= "A" && char <= "Z") {
-      number = char.charCodeAt(0) - 55;
-    } else {
-      number = 0;
-    }
-
-    sum += number * weights[i % 3];
-  }
-
-  return String(sum % 10);
-}
-
-function validate(data, requestedType) {
-  const checks = [];
-
-  checks.push({
-    ok:
-      data.document_type === requestedType ||
-      requestedType === "OTHER",
-
-    message:
-      "Jenis dokumen terbaca: " +
-      (data.document_type || "tidak diketahui")
-  });
-
-  if (data.document_type === "KTP") {
-    checks.push({
-      ok: validNIK(data.nik),
-
-      message: validNIK(data.nik)
-        ? "NIK terdiri dari 16 digit."
-        : "NIK tidak terbaca sebagai 16 digit."
-    });
-  }
-
-  if (data.document_type === "PASSPORT") {
-    checks.push({
-      ok: validPassport(data.passport_number),
-
-      message: validPassport(data.passport_number)
-        ? "Format nomor paspor terlihat wajar."
-        : "Nomor paspor perlu diperiksa."
-    });
-
-    const lines = String(data.mrz || "")
-      .split(/\r?\n/)
-      .map(x => x.replace(/\s/g, ""))
-      .filter(Boolean);
-
-    if (
-      lines.length >= 2 &&
-      lines[1].length >= 10 &&
-      data.passport_number
-    ) {
-      const line2 = lines[1];
-
-      const mrzNumber =
-        line2
-          .slice(0, 9)
-          .replace(/</g, "");
-
-      const checkDigit =
-        line2[9];
-
-      const expected =
-        checkMRZDigit(
-          line2.slice(0, 9)
-        );
-
-      const match =
-        mrzNumber ===
-          String(data.passport_number)
-            .toUpperCase()
-            .replace(/\s/g, "") &&
-        checkDigit === expected;
-
-      checks.push({
-        ok: match,
-
-        message: match
-          ? "Nomor paspor cocok dengan MRZ."
-          : "Nomor paspor tidak cocok dengan MRZ."
-      });
-
-    } else {
-
-      checks.push({
-        ok: false,
-        message:
-          "MRZ tidak terbaca lengkap. Perlu pemeriksaan manual."
-      });
-
-    }
-  }
-
-  return {
-    status:
-      checks.some(x => !x.ok)
-        ? "REVIEW"
-        : "VALID",
-
-    checks
-  };
-}
-
-function getSchema() {
-  return {
-    type: "object",
-
-    properties: {
-
-      document_type: {
-        type: "string",
-        enum: [
-          "KTP",
-          "PASSPORT",
-          "KK",
-          "OTHER"
-        ]
-      },
-
-      nama: {
-        type: ["string", "null"]
-      },
-
-      nik: {
-        type: ["string", "null"]
-      },
-
-      passport_number: {
-        type: ["string", "null"]
-      },
-
-      tempat_lahir: {
-        type: ["string", "null"]
-      },
-
-      tanggal_lahir: {
-        type: ["string", "null"]
-      },
-
-      jenis_kelamin: {
-        type: ["string", "null"]
-      },
-
-      nationality: {
-        type: ["string", "null"]
-      },
-
-      tanggal_terbit: {
-        type: ["string", "null"]
-      },
-
-      expiry_date: {
-        type: ["string", "null"]
-      },
-
-      alamat: {
-        type: ["string", "null"]
-      },
-
-      mrz: {
-        type: ["string", "null"]
-      },
-
-      kk_number: {
-        type: ["string", "null"]
-      },
-
-      members: {
-        type: "array",
-
-        items: {
-          type: "object",
-
-          properties: {
-
-            nama: {
-              type: ["string", "null"]
-            },
-
-            nik: {
-              type: ["string", "null"]
-            },
-
-            tanggal_lahir: {
-              type: ["string", "null"]
-            },
-
-            hubungan: {
-              type: ["string", "null"]
-            }
-
-          },
-
-          required: [
-            "nama",
-            "nik",
-            "tanggal_lahir",
-            "hubungan"
-          ],
-
-          additionalProperties: false
-        }
-      },
-
-      extraction_notes: {
-        type: "string"
-      }
-
-    },
-
-    required: [
-      "document_type",
-      "nama",
-      "nik",
-      "passport_number",
-      "tempat_lahir",
-      "tanggal_lahir",
-      "jenis_kelamin",
-      "nationality",
-      "tanggal_terbit",
-      "expiry_date",
-      "alamat",
-      "mrz",
-      "kk_number",
-      "members",
-      "extraction_notes"
-    ],
-
-    additionalProperties: false
-  };
-}
-
-
 module.exports = async function handler(req, res) {
-
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "*"
-  );
-
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type"
-  );
-
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "POST, OPTIONS"
-  );
-
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
+  // =========================================================
+  // JNI TRAVEL - OCR API
+  // OCR Engine: OCR.space
+  // =========================================================
 
   if (req.method !== "POST") {
-    return sendJSON(
-      res,
-      405,
-      {
-        error: "Method not allowed",
-        method: req.method
-      }
-    );
+    return res.status(405).json({
+      ok: false,
+      error: "Method not allowed",
+      method: req.method
+    });
   }
 
-
   try {
+    // -------------------------------------------------------
+    // 1. CEK API KEY OCR.SPACE
+    // -------------------------------------------------------
+    const apiKey = process.env.OCR_SPACE_API_KEY;
 
-    if (!process.env.MISTRAL_API_KEY) {
-
-      return sendJSON(
-        res,
-        500,
-        {
-          error:
-            "MISTRAL_API_KEY belum tersedia di Vercel."
-        }
-      );
-
+    if (!apiKey) {
+      return res.status(500).json({
+        ok: false,
+        error: "OCR_SPACE_API_KEY belum tersedia di Vercel."
+      });
     }
 
-
-    const body = req.body || {};
-
+    // -------------------------------------------------------
+    // 2. AMBIL DATA DARI FRONTEND
+    // -------------------------------------------------------
     const {
       documentType,
       fileName,
       mimeType,
       dataUrl
-    } = body;
-
+    } = req.body || {};
 
     if (!dataUrl) {
-
-      return sendJSON(
-        res,
-        400,
-        {
-          error:
-            "dataUrl file tidak ditemukan."
-        }
-      );
-
+      return res.status(400).json({
+        ok: false,
+        error: "File tidak ditemukan."
+      });
     }
 
-
-    if (!mimeType) {
-
-      return sendJSON(
-        res,
-        400,
-        {
-          error:
-            "mimeType file tidak ditemukan."
-        }
-      );
-
-    }
-
-
-    if (
-      !ALLOWED_TYPES.includes(
-        mimeType
-      )
-    ) {
-
-      return sendJSON(
-        res,
-        400,
-        {
-          error:
-            "Format file tidak didukung.",
-          received:
-            mimeType
-        }
-      );
-
-    }
-
-
-    const base64 =
-      String(dataUrl)
-        .split(",")[1] || "";
-
-
-    const estimatedSize =
-      Math.floor(
-        base64.length * 0.75
-      );
-
-
-    if (
-      estimatedSize >
-      MAX_BYTES
-    ) {
-
-      return sendJSON(
-        res,
-        413,
-        {
-          error:
-            "Ukuran file maksimal 2,5 MB untuk prototype."
-        }
-      );
-
-    }
-
-
-    let document;
-
-
-    if (
-      mimeType ===
+    // -------------------------------------------------------
+    // 3. VALIDASI FILE
+    // -------------------------------------------------------
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
       "application/pdf"
-    ) {
+    ];
 
-      document = {
-        type: "document_url",
-        document_url: dataUrl
-      };
-
-    } else {
-
-      document = {
-        type: "image_url",
-        image_url: dataUrl
-      };
-
+    if (mimeType && !allowedTypes.includes(mimeType)) {
+      return res.status(400).json({
+        ok: false,
+        error: `Format file tidak didukung: ${mimeType}`
+      });
     }
 
+    // -------------------------------------------------------
+    // 4. BATASI UKURAN
+    //
+    // OCR.space free:
+    // file size limit 1 MB
+    // -------------------------------------------------------
+    const base64Match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
 
-    const payload = {
+    if (!base64Match) {
+      return res.status(400).json({
+        ok: false,
+        error: "Format data file tidak valid."
+      });
+    }
 
-      model:
-        "mistral-ocr-latest",
+    const detectedMime = base64Match[1];
+    const base64Data = base64Match[2];
 
-      document,
+    // Perkiraan ukuran file dari Base64
+    const fileSizeBytes = Math.ceil((base64Data.length * 3) / 4);
 
-      document_annotation_format: {
+    const MAX_BYTES = 1 * 1024 * 1024;
 
-        type:
-          "json_schema",
+    if (fileSizeBytes > MAX_BYTES) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "Ukuran file lebih dari 1 MB. OCR.space Free memiliki batas file 1 MB."
+      });
+    }
 
-        json_schema: {
+    // -------------------------------------------------------
+    // 5. TENTUKAN FILE TYPE
+    // -------------------------------------------------------
+    let fileType = "";
 
-          name:
-            "jni_identity_document",
+    if (detectedMime === "application/pdf") {
+      fileType = "PDF";
+    } else if (detectedMime === "image/png") {
+      fileType = "PNG";
+    } else if (
+      detectedMime === "image/jpeg" ||
+      detectedMime === "image/jpg"
+    ) {
+      fileType = "JPG";
+    } else if (detectedMime === "image/webp") {
+      // OCR.space dokumentasi tidak mencantumkan WEBP
+      // sebagai format resmi yang didukung.
+      return res.status(400).json({
+        ok: false,
+        error:
+          "WEBP belum didukung langsung oleh OCR.space. Gunakan JPG atau PNG."
+      });
+    }
 
-          schema:
-            getSchema(),
+    // -------------------------------------------------------
+    // 6. BUAT REQUEST KE OCR.SPACE
+    // -------------------------------------------------------
+    const form = new FormData();
 
-          strict:
-            true
+    form.append(
+      "base64Image",
+      `data:${detectedMime};base64,${base64Data}`
+    );
 
-        }
+    // Auto-detection
+    form.append("language", "auto");
 
-      },
+    // Engine 2 = balance speed + accuracy
+    form.append("OCREngine", "2");
 
-      document_annotation_prompt: `
+    // Tidak perlu koordinat
+    form.append("isOverlayRequired", "false");
 
-Kamu adalah sistem OCR dokumen JNI Travel.
+    // Auto rotate dokumen
+    form.append("detectOrientation", "true");
 
-Jenis dokumen:
-${documentType}
+    // Membantu scan yang resolusinya rendah
+    form.append("scale", "true");
 
-Baca HANYA informasi yang benar-benar terlihat.
+    // -------------------------------------------------------
+    // 7. PANGGIL OCR.SPACE
+    // -------------------------------------------------------
+    const ocrResponse = await fetch(
+      "https://api.ocr.space/parse/image",
+      {
+        method: "POST",
+        headers: {
+          apikey: apiKey
+        },
+        body: form
+      }
+    );
 
-Jangan mengarang.
-Jangan menebak karakter yang tidak terbaca.
+    const rawText = await ocrResponse.text();
 
-Jika suatu informasi tidak terlihat jelas,
-isi null.
-
-Untuk KTP:
-- NIK
-- nama lengkap
-- tempat lahir
-- tanggal lahir
-- jenis kelamin
-- alamat
-
-Untuk PASPOR:
-- nomor paspor
-- nama
-- kewarganegaraan
-- jenis kelamin
-- tanggal lahir
-- tanggal terbit
-- tanggal expired
-- MRZ lengkap
-
-Untuk KK:
-- nomor KK
-- seluruh anggota keluarga
-- NIK
-- nama
-- tanggal lahir
-- hubungan keluarga
-
-Gunakan format tanggal YYYY-MM-DD
-jika tanggal dapat dibaca dengan jelas.
-
-`
-
-    };
-
-
-    const mistralResponse =
-      await fetch(
-        "https://api.mistral.ai/v1/ocr",
-        {
-
-          method:
-            "POST",
-
-          headers: {
-
-            "Authorization":
-              "Bearer " +
-              process.env.MISTRAL_API_KEY,
-
-            "Content-Type":
-              "application/json"
-
-          },
-
-          body:
-            JSON.stringify(
-              payload
-            )
-
-        }
-      );
-
-
-    const mistralText =
-      await mistralResponse.text();
-
-
-    let mistralData;
-
+    let ocrData;
 
     try {
-
-      mistralData =
-        JSON.parse(
-          mistralText
-        );
-
+      ocrData = JSON.parse(rawText);
     } catch {
-
-      return sendJSON(
-        res,
-        502,
-        {
-
-          error:
-            "Mistral mengembalikan response bukan JSON.",
-
-          httpStatus:
-            mistralResponse.status,
-
-          response:
-            mistralText.substring(
-              0,
-              1000
-            )
-
-        }
-      );
-
+      return res.status(502).json({
+        ok: false,
+        error: "OCR.space mengembalikan response bukan JSON.",
+        httpStatus: ocrResponse.status,
+        raw: rawText.substring(0, 1000)
+      });
     }
 
-
-    if (
-      !mistralResponse.ok
-    ) {
-
-      return sendJSON(
-        res,
-        mistralResponse.status,
-        {
-
-          error:
-            mistralData.message ||
-            mistralData.error ||
-            "Mistral OCR gagal.",
-
-          mistral:
-            mistralData
-
-        }
-      );
-
+    // -------------------------------------------------------
+    // 8. CEK ERROR OCR.SPACE
+    // -------------------------------------------------------
+    if (!ocrResponse.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: "OCR.space API error.",
+        httpStatus: ocrResponse.status,
+        details: ocrData
+      });
     }
 
+    if (ocrData.IsErroredOnProcessing) {
+      return res.status(422).json({
+        ok: false,
+        error:
+          ocrData.ErrorMessage ||
+          "OCR gagal memproses dokumen.",
+        details: ocrData.ErrorDetails || null,
+        ocr: ocrData
+      });
+    }
 
-    let data =
-      mistralData
-        .document_annotation;
+    // -------------------------------------------------------
+    // 9. GABUNGKAN HASIL OCR
+    // -------------------------------------------------------
+    const parsedResults = Array.isArray(ocrData.ParsedResults)
+      ? ocrData.ParsedResults
+      : [];
 
+    const text = parsedResults
+      .map((item) => item?.ParsedText || "")
+      .filter(Boolean)
+      .join("\n\n");
 
-    if (
-      typeof data ===
-      "string"
-    ) {
+    if (!text.trim()) {
+      return res.status(422).json({
+        ok: false,
+        error: "OCR selesai tetapi tidak menemukan teks.",
+        documentType: documentType || null,
+        fileName: fileName || null,
+        ocrExitCode: ocrData.OCRExitCode,
+        details: ocrData.ErrorDetails || null
+      });
+    }
 
-      try {
+    // -------------------------------------------------------
+    // 10. PARSER DASAR JNI
+    // -------------------------------------------------------
 
-        data =
-          JSON.parse(
-            data
-          );
+    const cleanText = text
+      .replace(/\r/g, "")
+      .replace(/[ \t]+/g, " ")
+      .trim();
 
-      } catch {
+    // -------------------------
+    // NIK
+    // -------------------------
+    const nikMatches = cleanText.match(/\b\d{16}\b/g) || [];
 
-        return sendJSON(
-          res,
-          502,
-          {
+    const nik =
+      nikMatches.length > 0
+        ? nikMatches[0]
+        : null;
 
-            error:
-              "document_annotation dari Mistral bukan JSON.",
+    // -------------------------
+    // NOMOR KK
+    // -------------------------
+    const kkNumber =
+      documentType?.toLowerCase() === "kk" && nikMatches.length > 0
+        ? nikMatches[0]
+        : null;
 
-            raw:
-              data
+    // -------------------------
+    // PASSPORT
+    //
+    // Format umum:
+    // 1 huruf + 7 angka
+    // -------------------------
+    const passportMatches =
+      cleanText.match(/\b[A-Z]{1}\d{7}\b/gi) || [];
 
-          }
-        );
+    const passportNumber =
+      passportMatches.length > 0
+        ? passportMatches[0].toUpperCase()
+        : null;
 
+    // -------------------------------------------------------
+    // 11. HASIL FINAL
+    // -------------------------------------------------------
+    return res.status(200).json({
+      ok: true,
+
+      fileName: fileName || null,
+
+      documentType: documentType || null,
+
+      data: {
+        document_type: documentType || null,
+
+        nama: null,
+
+        nik: nik,
+
+        passport_number: passportNumber,
+
+        tempat_lahir: null,
+
+        tanggal_lahir: null,
+
+        jenis_kelamin: null,
+
+        nationality: null,
+
+        tanggal_terbit: null,
+
+        expiry_date: null,
+
+        alamat: null,
+
+        mrz: null,
+
+        kk_number: kkNumber,
+
+        members: [],
+
+        extraction_notes: []
+      },
+
+      // -----------------------------------------------------
+      // OCR MENTAH
+      //
+      // Ini penting untuk tahap berikutnya.
+      // Parser JNI bisa kita tingkatkan berdasarkan
+      // hasil OCR nyata dari KTP / KK / Passport.
+      // -----------------------------------------------------
+      rawText: text,
+
+      cleanText: cleanText,
+
+      validation: {
+        nik_found: !!nik,
+        passport_found: !!passportNumber,
+        text_found: true
+      },
+
+      ocr: {
+        engine: 2,
+        exitCode: ocrData.OCRExitCode,
+        processingTimeMs:
+          ocrData.ProcessingTimeInMilliseconds || null,
+        pages: parsedResults.length
       }
-
-    }
-
-
-    if (
-      !data ||
-      typeof data !==
-      "object"
-    ) {
-
-      return sendJSON(
-        res,
-        502,
-        {
-
-          error:
-            "Mistral tidak mengembalikan hasil ekstraksi."
-
-        }
-      );
-
-    }
-
-
-    return sendJSON(
-      res,
-      200,
-      {
-
-        ok:
-          true,
-
-        fileName:
-          fileName || null,
-
-        data,
-
-        validation:
-          validate(
-            data,
-            documentType
-          ),
-
-        usage:
-          mistralData.usage_info ||
-          null
-
-      }
-    );
-
+    });
 
   } catch (error) {
+    console.error("JNI OCR ERROR:", error);
 
-    console.error(
-      "JNI OCR ERROR:",
-      error
-    );
-
-    return sendJSON(
-      res,
-      500,
-      {
-
-        error:
-          error.message ||
-          "Internal server error."
-
-      }
-    );
-
+    return res.status(500).json({
+      ok: false,
+      error: "Terjadi error pada server OCR.",
+      details: error?.message || String(error)
+    });
   }
-
 };
