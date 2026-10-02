@@ -1,52 +1,33 @@
 <!DOCTYPE html>
 <html lang="id">
-
 <head>
-
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>JNI Travel OCR</title>
 
   <style>
-
     * {
       box-sizing: border-box;
     }
 
     body {
       margin: 0;
-      font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
+      font-family: Arial, Helvetica, sans-serif;
       background: #f4fbfb;
       color: #123;
     }
 
     .container {
-      width: min(
-        1200px,
-        calc(100% - 32px)
-      );
-
+      width: min(1200px, calc(100% - 32px));
       margin: 30px auto;
     }
 
     .card {
       background: white;
-
       border: 1px solid #d9eeee;
-
       border-radius: 20px;
-
       padding: 28px;
-
       margin-bottom: 22px;
 
       box-shadow:
@@ -71,93 +52,73 @@
 
     label {
       display: block;
-
       font-weight: 700;
-
       margin-bottom: 8px;
     }
 
     select,
     input[type="file"] {
-
       width: 100%;
-
       padding: 13px;
 
-      border: 1px solid #cfe3e3;
+      border:
+        1px solid
+        #cfe3e3;
 
       border-radius: 10px;
-
       background: white;
-
       font-size: 15px;
-
     }
 
     button {
-
       border: 0;
-
       border-radius: 12px;
 
-      padding: 13px 22px;
+      padding:
+        13px 22px;
 
       font-size: 16px;
-
       font-weight: 700;
-
       cursor: pointer;
 
       margin-right: 8px;
-
     }
 
     .primary {
-
       background: #24b1b1;
-
       color: white;
-
     }
 
     .secondary {
-
       background: #eaf5f5;
-
       color: #126d6e;
-
     }
 
     button:disabled {
-
-      opacity: .5;
-
+      opacity: 0.5;
       cursor: not-allowed;
-
     }
 
     .status {
-
       margin-top: 18px;
-
       padding: 14px;
 
-      border-radius: 12px;
+      border-radius:
+        12px;
 
-      background: #eef8f4;
-
+      background:
+        #eef8f4;
     }
 
     .error {
+      background:
+        #fff0f0;
 
-      background: #fff0f0;
-
-      color: #a40000;
-
+      color:
+        #a40000;
     }
 
     .usage {
-
       display: grid;
 
       grid-template-columns:
@@ -167,45 +128,34 @@
         );
 
       gap: 14px;
-
       margin-top: 20px;
-
     }
 
     .usage-box {
+      border:
+        1px solid
+        #d9eeee;
 
-      border: 1px solid #d9eeee;
-
-      border-radius: 14px;
+      border-radius:
+        14px;
 
       padding: 18px;
-
       background: #fbffff;
-
     }
 
     .usage-title {
-
       font-size: 13px;
-
       color: #678;
-
       margin-bottom: 8px;
-
     }
 
     .usage-number {
-
       font-size: 24px;
-
       font-weight: 800;
-
       color: #0b6f70;
-
     }
 
     .grid {
-
       display: grid;
 
       grid-template-columns:
@@ -215,159 +165,154 @@
         );
 
       gap: 14px;
-
     }
 
     .field {
+      border:
+        1px solid
+        #dce9e9;
 
-      border: 1px solid #dce9e9;
-
-      border-radius: 12px;
+      border-radius:
+        12px;
 
       padding: 15px;
-
       background: #fff;
 
+      min-height:
+        84px;
+    }
+
+    .field-undetected {
+      border-color:
+        #ffd4d4;
+
+      background:
+        #fffafa;
     }
 
     .field-label {
-
       font-size: 13px;
-
       color: #6c7d7d;
 
-      margin-bottom: 6px;
-
+      margin-bottom:
+        6px;
     }
 
     .field-value {
-
       font-size: 16px;
-
       font-weight: 600;
 
-      word-break: break-word;
+      word-break:
+        break-word;
 
-      white-space: pre-wrap;
+      white-space:
+        pre-wrap;
+    }
 
+    .undetected {
+      color: #c62828;
+      font-weight: 700;
     }
 
     .full {
-
-      grid-column: 1 / -1;
-
+      grid-column:
+        1 / -1;
     }
 
     table {
-
       width: 100%;
 
-      border-collapse: collapse;
+      border-collapse:
+        collapse;
 
-      margin-top: 14px;
-
+      margin-top:
+        14px;
     }
 
     th,
     td {
-
-      border: 1px solid #dce9e9;
+      border:
+        1px solid
+        #dce9e9;
 
       padding: 10px;
 
-      text-align: left;
-
+      text-align:
+        left;
     }
 
     th {
-
-      background: #f0f8f8;
-
+      background:
+        #f0f8f8;
     }
 
     pre {
+      white-space:
+        pre-wrap;
 
-      white-space: pre-wrap;
+      word-break:
+        break-word;
 
-      word-break: break-word;
+      background:
+        #111;
 
-      background: #111;
+      color:
+        #e7f7f7;
 
-      color: #e7f7f7;
+      padding:
+        16px;
 
-      padding: 16px;
+      border-radius:
+        12px;
 
-      border-radius: 12px;
+      overflow-x:
+        auto;
 
-      overflow-x: auto;
-
-      font-size: 12px;
-
+      font-size:
+        12px;
     }
 
     details {
-
-      margin-top: 18px;
-
+      margin-top:
+        18px;
     }
 
     summary {
-
       cursor: pointer;
-
       font-weight: 700;
-
     }
 
     .small {
-
       font-size: 13px;
-
       color: #678;
-
       line-height: 1.5;
-
     }
 
-    @media (
-      max-width: 700px
-    ) {
-
+    @media (max-width: 700px) {
       .grid,
       .usage {
-
-        grid-template-columns: 1fr;
-
+        grid-template-columns:
+          1fr;
       }
 
       .card {
-
         padding: 20px;
-
       }
 
       .container {
-
         width:
           calc(100% - 20px);
-
       }
-
     }
-
   </style>
-
 </head>
-
 
 <body>
 
-
 <div class="container">
 
-
   <!-- =====================================================
-       HEADER
+       INPUT
   ====================================================== -->
 
   <div class="card">
@@ -377,20 +322,14 @@
     </h1>
 
     <p class="small">
-      Baca KTP, KK, dan Passport
-      secara otomatis.
+      Baca KTP, KK, dan Passport secara otomatis.
     </p>
-
 
     <label>
       Jenis Dokumen
     </label>
 
-
-    <select
-      id="documentType"
-    >
-
+    <select id="documentType">
       <option value="ktp">
         KTP
       </option>
@@ -402,18 +341,14 @@
       <option value="passport">
         Passport
       </option>
-
     </select>
 
-
     <br>
     <br>
-
 
     <label>
       Upload Dokumen
     </label>
-
 
     <input
       id="fileInput"
@@ -421,15 +356,12 @@
       accept=".jpg,.jpeg,.png,.webp,.pdf"
     >
 
-
     <p
       id="fileInfo"
       class="small"
     ></p>
 
-
     <br>
-
 
     <button
       id="readButton"
@@ -438,14 +370,12 @@
       🔍 Baca Dokumen
     </button>
 
-
     <button
       id="resetButton"
       class="secondary"
     >
       Reset
     </button>
-
 
     <div
       id="status"
@@ -457,7 +387,7 @@
 
 
   <!-- =====================================================
-       LIMIT
+       USAGE
   ====================================================== -->
 
   <div class="card">
@@ -466,23 +396,14 @@
       Penggunaan OCR
     </h2>
 
-
     <p class="small">
-
-      Counter ini adalah counter lokal
-      browser/perangkat ini.
-
+      Counter ini adalah counter lokal browser/perangkat ini.
       <br>
-
-      Limit resmi OCR.space:
-      500 request/hari/IP dan
+      Limit resmi OCR.space: 500 request/hari/IP dan
       25.000 conversion/bulan.
-
     </p>
 
-
     <div class="usage">
-
 
       <div class="usage-box">
 
@@ -523,7 +444,6 @@
 
       </div>
 
-
     </div>
 
   </div>
@@ -547,28 +467,22 @@
 
   </div>
 
-
 </div>
 
 
 <script>
 
-
   // =======================================================
   // LIMIT
   // =======================================================
 
-  const DAILY_LIMIT =
-    500;
+  const DAILY_LIMIT = 500;
 
-  const MONTHLY_LIMIT =
-    25000;
+  const MONTHLY_LIMIT = 25000;
 
-  const DAILY_SAFE_LIMIT =
-    490;
+  const DAILY_SAFE_LIMIT = 490;
 
-  const MONTHLY_SAFE_LIMIT =
-    24900;
+  const MONTHLY_SAFE_LIMIT = 24900;
 
 
   // =======================================================
@@ -602,44 +516,46 @@
             "2-digit"
         }
       )
-        .formatToParts(
-          new Date()
-        );
+      .formatToParts(
+        new Date()
+      );
 
     const map = {};
 
     for (
-      const p of parts
+      const part
+      of parts
     ) {
 
       if (
-        p.type !==
+        part.type !==
         "literal"
       ) {
 
-        map[p.type] =
-          p.value;
+        map[
+          part.type
+        ] =
+          part.value;
 
       }
 
     }
 
-    const day =
-      `${map.year}-${map.month}-${map.day}`;
-
-    const month =
-      `${map.year}-${map.month}`;
-
     return {
-      day,
-      month
+
+      day:
+        `${map.year}-${map.month}-${map.day}`,
+
+      month:
+        `${map.year}-${map.month}`
+
     };
 
   }
 
 
   // =======================================================
-  // GET USAGE
+  // USAGE
   // =======================================================
 
   function getUsage() {
@@ -658,7 +574,9 @@
           ) || "{}"
         );
 
-    } catch {
+    }
+
+    catch {
 
       data = {};
 
@@ -717,7 +635,9 @@
 
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(data)
+      JSON.stringify(
+        data
+      )
     );
 
 
@@ -726,27 +646,21 @@
   }
 
 
-  // =======================================================
-  // SAVE
-  // =======================================================
-
   function saveUsage(
     data
   ) {
 
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(data)
+      JSON.stringify(
+        data
+      )
     );
 
     renderUsage();
 
   }
 
-
-  // =======================================================
-  // RENDER USAGE
-  // =======================================================
 
   function renderUsage() {
 
@@ -768,10 +682,6 @@
   }
 
 
-  // =======================================================
-  // CHECK LIMIT
-  // =======================================================
-
   function canUseOCR(
     estimatedConversions = 1
   ) {
@@ -790,9 +700,7 @@
         ok: false,
 
         message:
-          "Batas aman OCR hari ini sudah tercapai (" +
-          DAILY_SAFE_LIMIT +
-          " request)."
+          "Batas aman OCR hari ini sudah tercapai."
 
       };
 
@@ -810,7 +718,7 @@
         ok: false,
 
         message:
-          "Batas aman conversion bulan ini hampir tercapai."
+          "Batas aman OCR bulan ini sudah tercapai."
 
       };
 
@@ -825,7 +733,7 @@
 
 
   // =======================================================
-  // ELEMENT
+  // ELEMENTS
   // =======================================================
 
   const fileInput =
@@ -833,36 +741,30 @@
       "fileInput"
     );
 
-
   const documentType =
     document.getElementById(
       "documentType"
     );
-
 
   const readButton =
     document.getElementById(
       "readButton"
     );
 
-
   const resetButton =
     document.getElementById(
       "resetButton"
     );
-
 
   const status =
     document.getElementById(
       "status"
     );
 
-
   const resultCard =
     document.getElementById(
       "resultCard"
     );
-
 
   const result =
     document.getElementById(
@@ -935,7 +837,7 @@
 
 
   // =======================================================
-  // FILE -> DATA URL
+  // READ FILE
   // =======================================================
 
   function readAsDataURL(
@@ -974,7 +876,62 @@
 
 
   // =======================================================
-  // DISPLAY VALUE
+  // DETECT EMPTY / UNDETECTED VALUE
+  // =======================================================
+
+  function isUndetected(
+    value
+  ) {
+
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return true;
+    }
+
+    const text =
+      String(value)
+        .trim();
+
+
+    if (!text) {
+      return true;
+    }
+
+
+    if (
+      text === "-" ||
+      text === "–" ||
+      text === "—"
+    ) {
+      return true;
+    }
+
+
+    if (
+      text.toLowerCase() ===
+      "null"
+    ) {
+      return true;
+    }
+
+
+    if (
+      text.toLowerCase() ===
+      "undefined"
+    ) {
+      return true;
+    }
+
+
+    return false;
+
+  }
+
+
+  // =======================================================
+  // DISPLAY
   // =======================================================
 
   function displayValue(
@@ -982,16 +939,18 @@
   ) {
 
     if (
-      value === null ||
-      value === undefined ||
-      value === ""
+      isUndetected(
+        value
+      )
     ) {
 
-      return "-";
+      return "⚠ Tidak dapat terdeteksi";
 
     }
 
-    return String(value);
+    return String(
+      value
+    );
 
   }
 
@@ -1006,20 +965,42 @@
     full = false
   ) {
 
+    const missing =
+      isUndetected(
+        value
+      );
+
+
     return `
 
       <div
-        class="field ${full ? "full" : ""}"
+        class="
+          field
+          ${full ? "full" : ""}
+          ${missing ? "field-undetected" : ""}
+        "
       >
 
         <div class="field-label">
-          ${escapeHtml(label)}
-        </div>
-
-        <div class="field-value">
 
           ${escapeHtml(
-            displayValue(value)
+            label
+          )}
+
+        </div>
+
+
+        <div
+          class="
+            field-value
+            ${missing ? "undetected" : ""}
+          "
+        >
+
+          ${escapeHtml(
+            displayValue(
+              value
+            )
           )}
 
         </div>
@@ -1032,7 +1013,7 @@
 
 
   // =======================================================
-  // RENDER KTP
+  // KTP
   // =======================================================
 
   function renderKTP(
@@ -1112,12 +1093,26 @@
 
 
   // =======================================================
-  // RENDER PASSPORT
+  // PASSPORT
   // =======================================================
 
   function renderPassport(
     data
   ) {
+
+    // Support backend baru dan backend lama.
+
+    const tanggalExpired =
+      data.tanggal_expired ||
+      data.expiry_date ||
+      null;
+
+
+    const issuingOffice =
+      data.issuing_office ||
+      data.issuing_authority ||
+      null;
+
 
     return `
 
@@ -1160,12 +1155,12 @@
 
         ${field(
           "Tanggal Expired",
-          data.expiry_date
+          tanggalExpired
         )}
 
         ${field(
           "Issuing Office",
-          data.issuing_authority
+          issuingOffice
         )}
 
         ${field(
@@ -1182,48 +1177,137 @@
 
 
   // =======================================================
-  // RENDER KK
+  // KK
   // =======================================================
 
   function renderKK(
     data
   ) {
 
+    /*
+     * Support dua format backend:
+     *
+     * 1. members[]
+     * 2. data tunggal
+     */
+
+    let members = [];
+
+
+    if (
+      Array.isArray(
+        data.members
+      )
+    ) {
+
+      members =
+        data.members;
+
+    }
+
+    else if (
+      data.nik ||
+      data.nama ||
+      data.nama_ayah
+    ) {
+
+      members = [
+        {
+          nik:
+            data.nik,
+
+          nama:
+            data.nama,
+
+          nama_ayah:
+            data.nama_ayah
+        }
+      ];
+
+    }
+
+
     let rows =
       "";
 
 
     for (
-      const member of
-      data.members || []
+      const member
+      of members
     ) {
+
+      const nikMissing =
+        isUndetected(
+          member.nik
+        );
+
+      const namaMissing =
+        isUndetected(
+          member.nama
+        );
+
+      const ayahMissing =
+        isUndetected(
+          member.nama_ayah
+        );
+
 
       rows += `
 
         <tr>
 
-          <td>
+          <td class="${nikMissing ? "undetected" : ""}">
+
             ${escapeHtml(
               displayValue(
                 member.nik
               )
             )}
+
           </td>
 
-          <td>
+
+          <td class="${namaMissing ? "undetected" : ""}">
+
             ${escapeHtml(
               displayValue(
                 member.nama
               )
             )}
+
           </td>
 
-          <td>
+
+          <td class="${ayahMissing ? "undetected" : ""}">
+
             ${escapeHtml(
               displayValue(
                 member.nama_ayah
               )
             )}
+
+          </td>
+
+        </tr>
+
+      `;
+
+    }
+
+
+    if (!rows) {
+
+      rows = `
+
+        <tr>
+
+          <td
+            colspan="3"
+            class="undetected"
+          >
+
+            ⚠ Tidak dapat terdeteksi
+
           </td>
 
         </tr>
@@ -1271,20 +1355,7 @@
 
         <tbody>
 
-          ${
-            rows ||
-            `
-
-              <tr>
-
-                <td colspan="3">
-                  Tidak ada data anggota
-                </td>
-
-              </tr>
-
-            `
-          }
+          ${rows}
 
         </tbody>
 
@@ -1296,14 +1367,16 @@
 
 
   // =======================================================
-  // ESCAPE
+  // HTML ESCAPE
   // =======================================================
 
   function escapeHtml(
     value
   ) {
 
-    return String(value)
+    return String(
+      value
+    )
 
       .replace(
         /&/g,
@@ -1334,7 +1407,7 @@
 
 
   // =======================================================
-  // RENDER RESULT
+  // RESULT
   // =======================================================
 
   function renderResult(
@@ -1343,7 +1416,6 @@
 
     const type =
       payload.documentType;
-
 
     const data =
       payload.data || {};
@@ -1388,14 +1460,15 @@
 
     else {
 
-      html =
-        `<pre>${escapeHtml(
-          JSON.stringify(
-            data,
-            null,
-            2
-          )
-        )}</pre>`;
+      html = `
+
+        <div class="status error">
+
+          ⚠ Jenis dokumen tidak dapat terdeteksi.
+
+        </div>
+
+      `;
 
     }
 
@@ -1408,58 +1481,28 @@
       payload.validation || {};
 
 
+    const missing =
+      Array.isArray(
+        validation.missing
+      )
+        ? validation.missing
+        : [];
+
+
+    const invalid =
+      Array.isArray(
+        validation.invalid
+      )
+        ? validation.invalid
+        : [];
+
+
     let validationHtml =
       "";
 
 
     if (
-      validation.missing &&
-      validation.missing.length
-    ) {
-
-      validationHtml = `
-
-        <div class="status error">
-
-          <strong>
-            Data belum terbaca:
-          </strong>
-
-          <br>
-
-          ${escapeHtml(
-            validation.missing.join(
-              ", "
-            )
-          )}
-
-        </div>
-
-      `;
-
-    }
-
-    else {
-
-      validationHtml = `
-
-        <div class="status">
-
-          <strong>
-            ✓ Validasi dasar lengkap
-          </strong>
-
-        </div>
-
-      `;
-
-    }
-
-
-    // Invalid
-    if (
-      validation.invalid &&
-      validation.invalid.length
+      missing.length
     ) {
 
       validationHtml += `
@@ -1467,16 +1510,63 @@
         <div class="status error">
 
           <strong>
-            Perlu dicek:
+            ⚠ Data tidak dapat terdeteksi:
           </strong>
 
           <br>
 
           ${escapeHtml(
-            validation.invalid.join(
+            missing.join(
               ", "
             )
           )}
+
+        </div>
+
+      `;
+
+    }
+
+
+    if (
+      invalid.length
+    ) {
+
+      validationHtml += `
+
+        <div class="status error">
+
+          <strong>
+            ⚠ Data perlu dicek:
+          </strong>
+
+          <br>
+
+          ${escapeHtml(
+            invalid.join(
+              ", "
+            )
+          )}
+
+        </div>
+
+      `;
+
+    }
+
+
+    if (
+      !missing.length &&
+      !invalid.length
+    ) {
+
+      validationHtml = `
+
+        <div class="status">
+
+          <strong>
+            ✓ Data utama berhasil terdeteksi
+          </strong>
 
         </div>
 
@@ -1519,7 +1609,7 @@
 
 
   // =======================================================
-  // READ BUTTON
+  // READ
   // =======================================================
 
   readButton.addEventListener(
@@ -1552,7 +1642,7 @@
       ) {
 
         showStatus(
-          "File lebih dari 1 MB. Kompres dulu.",
+          "File lebih dari 1 MB. Kompres file terlebih dahulu.",
           true
         );
 
@@ -1564,10 +1654,6 @@
       // ===================================================
       // LIMIT
       // ===================================================
-
-      // Gambar = 1 conversion.
-      // PDF kita estimasikan maksimal 3 halaman
-      // untuk menjaga buffer Free OCR.space.
 
       const estimatedConversions =
         file.type ===
@@ -1605,8 +1691,12 @@
         );
 
 
+        resultCard.style.display =
+          "none";
+
+
         // =================================================
-        // DATA URL
+        // FILE
         // =================================================
 
         const dataUrl =
@@ -1673,11 +1763,7 @@
         catch {
 
           throw new Error(
-            "Server mengembalikan response bukan JSON.\n" +
-            raw.substring(
-              0,
-              1000
-            )
+            "Server mengembalikan response bukan JSON."
           );
 
         }
@@ -1697,7 +1783,7 @@
 
 
         // =================================================
-        // COUNT ACTUAL SUCCESSFUL OCR
+        // COUNTER
         // =================================================
 
         const usage =
@@ -1711,6 +1797,7 @@
         usage.monthly +=
           Number(
             payload?.ocr?.pages ||
+            payload?.ocr?.parsedResultsCount ||
             1
           );
 
@@ -1721,18 +1808,17 @@
 
 
         // =================================================
-        // SHOW
+        // RESULT
         // =================================================
 
         showStatus(
-          "Dokumen berhasil dibaca."
+          "Dokumen berhasil diproses."
         );
 
 
         renderResult(
           payload
         );
-
 
       }
 
@@ -1773,14 +1859,18 @@
       fileInput.value =
         "";
 
+
       result.innerHTML =
         "";
+
 
       resultCard.style.display =
         "none";
 
+
       status.style.display =
         "none";
+
 
       document.getElementById(
         "fileInfo"
@@ -1797,10 +1887,7 @@
 
   renderUsage();
 
-
 </script>
 
-
 </body>
-
 </html>
